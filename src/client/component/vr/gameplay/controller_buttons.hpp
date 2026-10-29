@@ -2,6 +2,7 @@
 
 #include "../controller_input.hpp"
 #include "component/vr/digital_button_gate.hpp"
+#include <cmath>
 
 namespace vr::controller_input
 {
@@ -34,8 +35,16 @@ namespace vr::controller_input
 			last_time_ = now;
 			const int changed = (input.sprint.presses != sprint_.presses ? sprint_button : 0) |
 				(input.jump.presses != jump_.presses ? jump_button : 0);
-			const int held = (sprint_.consume(input.sprint) ? sprint_button : 0) |
+			int held = (sprint_.consume(input.sprint) ? sprint_button : 0) |
 				(jump_.consume(input.jump) ? jump_button : 0);
+			// Gamepad-style sprint: a stick click while pushing forward keeps the
+			// native sprint request until forward input is released. Requiring the
+			// click to stay held made sprint stop after a split second on Quest and
+			// PSVR2 sticks, which also blocked the Cliffhanger gap jump.
+			const float forward = input.move_active && std::isfinite(input.move[1]) ? input.move[1] : 0.f;
+			if ((held & sprint_button) && forward >= sprint_latch_forward) sprint_latched_ = true;
+			else if (forward < sprint_release_forward) sprint_latched_ = false;
+			if (sprint_latched_) held |= sprint_button;
 			// The level gates own admission/rearming for both outputs. A changed
 			// counter from a rejected generation must never become a script event.
 			return {held, held & changed};
@@ -46,11 +55,14 @@ namespace vr::controller_input
 			sprint_ = {};
 			jump_ = {};
 			sequence_ = 0;
+			sprint_latched_ = false;
 		}
 
 	private:
+		static constexpr float sprint_latch_forward = .5f, sprint_release_forward = .3f;
 		digital_button_gate sprint_;
 		digital_button_gate jump_;
+		bool sprint_latched_{};
 		std::uint64_t reference_generation_{};
 		std::uint64_t sequence_{};
 		clock::time_point last_time_{};

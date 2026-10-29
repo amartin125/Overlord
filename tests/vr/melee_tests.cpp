@@ -259,6 +259,9 @@ int main()
 	check(npc_collision::merge(original,{0,true,true},npc).allsolid,"environment initial overlap never becomes passable");
 	check(npc_collision::merge(original,clear,{0,true,true}).allsolid,"NPC core initial overlap remains blocked");
 	check(npc_collision::merge(original,{std::numeric_limits<float>::quiet_NaN()},npc).fraction==original.fraction,"invalid supplemental collision results retain the native answer");
+	check(npc_collision::pass_through(original,clear).fraction==1,"pass-through lets the player walk out of an NPC overlap");
+	check(npc_collision::pass_through(original,wall).fraction==.5f && npc_collision::pass_through(original,{0,true,true}).allsolid,"pass-through keeps walls and environment overlap blocking");
+	check(npc_collision::pass_through(original,{std::numeric_limits<float>::quiet_NaN()}).fraction==original.fraction,"invalid pass-through sweep retains the native answer");
 	check((weapons::muzzle_clearance_mask&int(npc_collision::actor_contents))==0 &&
 		(weapons::muzzle_clearance_mask&0x2000000)!=0,"muzzle clearance ignores NPC contents but retains the cover layer");
 	std::cout<<"melee failures="<<failures<<'\n';return failures ? 1 : 0;

@@ -32,6 +32,15 @@ module now transports both values instead of substituting small generic action
 radii. Ordinary support checks use the solved anchor; M203 support uses the
 equivalent raw hand-span distance, independent of steering rotation.
 
+## Support grip lock
+
+`vr_supportGripLock` (launcher: Keep support grip attached) previously skipped
+module-owned support, so M203, GP-25 and underbarrel-shotgun support still broke
+away by hand distance and palm angle (upstream issue #120). With the lock on,
+module support now ignores those spatial checks as ordinary foregrips do; Grip
+release, an occupied hand and tracking loss still end it, and an empty M203 can
+still slide open from the held support.
+
 ## M203 close transition
 
 Closing a loaded M203 retains the existing grip as support. The loaded support

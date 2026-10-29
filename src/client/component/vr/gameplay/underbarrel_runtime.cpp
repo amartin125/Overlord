@@ -43,6 +43,13 @@ namespace vr::gameplay::weapons::underbarrel
 		game::dvar_t* smart_ammo_selection{};
 		game::dvar_t* support_fire_dvar{};
 		bool support_fire_enabled()noexcept{return !support_fire_dvar || support_fire_dvar->current.enabled;}
+		bool support_lock_enabled()noexcept
+		{
+			// Registered by the carry runtime, which owns the launcher setting.
+			static const game::dvar_t* lock=nullptr;
+			if(!lock)lock=game::Dvar_FindVar(settings::support_grip_lock.name);
+			return lock ? lock->current.enabled : settings::support_grip_lock.default_value;
+		}
 		bool smart_supply_enabled()noexcept
 		{return smart_ammo_selection ? smart_ammo_selection->current.enabled : settings::smart_ammo_selection.default_value;}
 		std::mutex publication;
@@ -330,7 +337,9 @@ namespace vr::gameplay::weapons::underbarrel
 			if (runtime.view.grip == lease::support && contact.type == kind::gp25)
 			{
 				if (!grip_down || !hand_available ||
-				    contact.action_distance > std::max(support_tolerance.retention, contact.support_radius))
+				    !support_retained(support_lock_enabled(),
+				                      contact.action_distance <= std::max(support_tolerance.retention, contact.support_radius),
+				                      true))
 					runtime.view.grip = lease::none;
 			}
 			if (runtime.view.grip == lease::support && contact.type != kind::gp25)
@@ -353,8 +362,8 @@ namespace vr::gameplay::weapons::underbarrel
 				                                                             support_tolerance.step)
 				                                     : shared.valid)
 				        : contact.action_retention_distance <= support_tolerance.retention;
-				if (!grip_down || !hand_available || !retained ||
-				    !support_facing(orientation, true, contact.type))
+				if (!grip_down || !hand_available ||
+				    !support_retained(support_lock_enabled(), retained, support_facing(orientation, true, contact.type)))
 					runtime.view.grip = lease::none;
 				else if (!runtime.view.ammo.chamber &&
 				         (contact.type == kind::m203

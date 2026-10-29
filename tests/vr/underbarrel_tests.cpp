@@ -557,6 +557,8 @@ int main()
 			!u::support_fire(u::kind::m203,u::contact_role::support,NAN,true) && !u::support_fire(u::kind::gp25,u::contact_role::support,0,true),
 			"held closed M203 support may fire only when enabled; open, moving or pinched tubes may not");
 		check(u::choose_grip(loaded,0,1,.09f,{1,0},.12f,true)==u::contact_role::support,"M203 support capture is unchanged by the shotgun support option");
+		check(u::support_retained(true,false,false) && u::support_retained(false,true,true) && !u::support_retained(false,false,true) && !u::support_retained(false,true,false),
+			"support grip lock keeps module support attached beyond its breakaway; unlocked support keeps spatial release");
 		const float stroke=u::authored::m203_stroke;
 		check(u::project_stroke({},{},{stroke,0,0},{1,0,0},0,stroke).travel==stroke,"full forward M203 stroke opens");
 		check(u::project_stroke({stroke,0,0},{stroke,0,0},{},{1,0,0},stroke,stroke).travel==0,"reverse stroke returns the opened M203 fully closed");

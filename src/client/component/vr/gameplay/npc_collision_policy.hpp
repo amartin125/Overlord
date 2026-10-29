@@ -30,4 +30,9 @@ namespace vr::gameplay::npc_collision
 		if (contact.startsolid || contact.allsolid) return contact;
 		return environment.fraction<=contact.fraction ? environment : contact;
 	}
+	// Optional pass-through: players reported both sides getting stuck once the
+	// reduced core overlapped a friendly NPC in doorways and corridors. Use only
+	// the full-sized environment sweep; a failed sweep keeps the native answer.
+	template<class Trace> Trace pass_through(const Trace& original,const Trace& environment) noexcept
+	{return valid(original) && valid(environment) ? environment : original;}
 }

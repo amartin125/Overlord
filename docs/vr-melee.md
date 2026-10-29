@@ -294,6 +294,12 @@ cooldown-rejected contacts cannot queue this sound.
 
 ## Diagnostics and acceptance
 
+`vr_npcPassThrough` (saved, default on) goes further for the reports in
+upstream issues #118, #45 and #47: when the native player sweep hits an actor,
+only the full-sized environment sweep is used, so the player can walk through
+and out of NPC bodies while walls, floors, ceilings and props keep their
+original clearance. Turning it off restores the reduced-core policy below.
+
 `vr_closeNpcCollision` reduces the player's horizontal query radius against
 native actors from the usual 15 units to 9. NPC bounds and player vertical bounds
 remain native. The shared PM trace boundary uses matching prediction/server

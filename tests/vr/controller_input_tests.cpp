@@ -258,6 +258,22 @@ int main()
 	sample_buttons(false, false);
 	check(read_buttons() == jump_button && button_result.pressed == jump_button,
 		"second completed jump tap has its own script notification");
+	{
+		command_buttons latch;digital_sampler sprint_input,jump_input;frame f{};
+		f.sequence=f.reference_generation=1;f.focused=f.move_active=true;f.sampled_at=now;
+		const auto step=[&](bool sprint,float forward){f.sprint=sprint_input.sample(true,sprint,f.sampled_at);f.jump=jump_input.sample(true,false,f.sampled_at);
+			f.move={0,forward};++f.sequence;return latch.consume(f,true,f.sampled_at);};
+		step(false,0);
+		check(step(true,.9f).held==sprint_button,"stick click while pushing forward requests sprint");
+		check(step(false,.9f).held==sprint_button,"releasing the click keeps sprinting while forward is held");
+		check(step(false,.4f).held==sprint_button,"easing off forward slightly keeps the sprint");
+		check(step(false,.1f).held==0,"releasing forward ends the latched sprint");
+		check(step(false,.9f).held==0,"pushing forward again does not resume sprint without a new click");
+		step(true,0);
+		check(step(false,.9f).held==0,"a click while standing still does not latch sprint");
+		step(true,.9f);step(false,.9f);
+		check(latch.consume(f,false,f.sampled_at).held==0 && step(false,.9f).held==0,"pause or menu clears the latched sprint");
+	}
 	sample_buttons(false, true);
 	check(read_buttons() == jump_button && button_result.pressed == jump_button,
 		"new press immediately after a completed tap is not lost to held-mask edge detection");

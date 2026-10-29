@@ -17,7 +17,14 @@ namespace vr::gameplay::ads_sprint
 	namespace
 	{
 		game::dvar_t* enabled{};
+		game::dvar_t* full_speed{};
 		std::atomic_bool installed{}, alive{true};
+		bool local(const game::playerState_s* ps) noexcept
+		{
+			return alive.load(std::memory_order_relaxed) && installed.load(std::memory_order_relaxed) &&
+				game::CL_IsCgameInitialized() && weapons::native_ammunition::local_role(ps) >= 0 &&
+				head_pose_bridge::get_status().enabled;
+		}
 		std::array<std::atomic_uint64_t, 4> relaxed{};
 		utils::hook::detour slow_walk_hook;
 		std::atomic_uint64_t slow_walk_suppressed{};
@@ -27,7 +34,8 @@ namespace vr::gameplay::ads_sprint
 			// eligibility. Finalize this derived movement flag, not the ADS state,
 			// fraction, speed dvars, weapon assets or the user's input command.
 			const auto before = static_cast<std::uint32_t>(pm->ps->pm_flags);
-			const auto after = movement_flags(before, allowed(pm->ps));
+			const auto after = movement_flags(before, allowed(pm->ps),
+				full_speed && full_speed->current.enabled && local(pm->ps));
 			if (after != before)
 			{
 				pm->ps->pm_flags = static_cast<int>(after);
@@ -46,9 +54,7 @@ namespace vr::gameplay::ads_sprint
 
 	bool allowed(const game::playerState_s* ps) noexcept
 	{
-		return alive.load(std::memory_order_relaxed) && installed.load(std::memory_order_relaxed) &&
-			enabled && enabled->current.enabled && game::CL_IsCgameInitialized() &&
-			weapons::native_ammunition::local_role(ps) >= 0 && head_pose_bridge::get_status().enabled;
+		return enabled && enabled->current.enabled && local(ps);
 	}
 
 	class component final : public component_interface
@@ -57,10 +63,12 @@ namespace vr::gameplay::ads_sprint
 		{
 			enabled = dvars::register_bool(settings::ads_sprint.name, settings::ads_sprint.default_value,
 				game::DVAR_FLAG_SAVED, "Allow native sprint while aiming down sights in VR");
+			full_speed = dvars::register_bool("vr_adsFullSpeed", true, game::DVAR_FLAG_SAVED,
+				"Walk at normal speed while aiming down sights in VR instead of the native ADS slowdown");
 			command::add("vr_ads_sprint_status", [] {
-				console::info("[VR ADS sprint] installed=%d enabled=%d sustain_flags=%llu sustain_buttons=%llu "
+				console::info("[VR ADS sprint] installed=%d enabled=%d full_speed=%d sustain_flags=%llu sustain_buttons=%llu "
 					"start_buttons=%llu start_flags=%llu slow_walk_suppressed=%llu (relaxed checks, not runtime acceptance)\n",
-					installed.load(), enabled && enabled->current.enabled,
+					installed.load(), enabled && enabled->current.enabled, full_speed && full_speed->current.enabled,
 					relaxed[0].load(), relaxed[1].load(), relaxed[2].load(), relaxed[3].load(), slow_walk_suppressed.load());
 			});
 			constexpr std::uint8_t slow_walk_entry[]{0x48,0x8b,0x11,0x83,0x62,0x54,0xbf,0x80,0x7a,0x02,0x05,0x44,0x8b,0x42,0x54};

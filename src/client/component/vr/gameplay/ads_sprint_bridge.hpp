@@ -11,11 +11,18 @@ namespace vr::gameplay::ads_sprint
 	// PM updates sprint before deriving the ADS slow-walk flag. Suppress only
 	// that derived penalty while native sprint is actually active; a sprint
 	// button alone must not bypass ordinary aiming speed or native eligibility.
-	inline constexpr std::uint32_t movement_flags(std::uint32_t native_flags, bool enabled) noexcept
+	// full_speed: optional VR policy removing the ADS walk penalty entirely.
+	// In VR the weapon is raised to the eye for every aimed shot, so automatic
+	// ADS slowed players to a crawl while clearing rooms.
+	inline constexpr std::uint32_t movement_flags(std::uint32_t native_flags, bool enabled, bool full_speed = false) noexcept
 	{
-		return enabled && (native_flags & sprint_flag)
+		return full_speed || (enabled && (native_flags & sprint_flag))
 			? native_flags & ~ads_slow_walk_flag : native_flags;
 	}
+	static_assert(movement_flags(ads_slow_walk_flag, false, true) == 0 &&
+		movement_flags(ads_slow_walk_flag | ads_flag, true, false) == (ads_slow_walk_flag | ads_flag) &&
+		movement_flags(ads_slow_walk_flag | sprint_flag, true, false) == sprint_flag &&
+		movement_flags(ads_slow_walk_flag, false, false) == ads_slow_walk_flag);
 	inline constexpr bool button_boundary(boundary point) noexcept
 	{ return point == boundary::sustain_buttons || point == boundary::start_buttons; }
 	inline constexpr std::uint32_t filter_mask(std::uint32_t mask, boundary point, bool enabled) noexcept

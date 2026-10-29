@@ -84,6 +84,11 @@ namespace vr::gameplay::weapons::underbarrel
 		if(fire && (!action || fire_distance/firing_acquire<=action_distance/radius))return contact_role::firing;
 		return action?(closed_support?contact_role::support:contact_role::action):contact_role::none;
 	}
+	// "Keep support grip attached" retains ordinary foregrips regardless of hand
+	// distance, but module-owned M203/GP-25/shotgun support still broke away
+	// spatially, so grenade-launcher rifles dropped the support hand. Apply the
+	// same lock to module support; Grip release and tracking loss still end it.
+	inline bool support_retained(bool locked,bool spatial,bool facing)noexcept{return locked || (spatial && facing);}
 	// Players held the launcher like a foregrip and pulled Trigger; the separate
 	// directional firing grasp (palm turned inward within 40 degrees at a 7.5 cm
 	// contact) was never discovered. Optionally let a held, closed M203 support
