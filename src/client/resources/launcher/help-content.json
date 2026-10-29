@@ -847,7 +847,7 @@
             "明确向下推右摇杆：站立变蹲姿，再推一次变趴姿。明确向上推则反向逐级起身。",
             "每次操作后让摇杆上下方向回中；持续推住一段时间也会继续变换一档。",
             "蹲着或趴着时，按下右摇杆先起身。这一次持续按住不会紧接着跳；站稳后重新按下才请求跳跃。",
-            "低矮空间、梯子和部分剧情阶段会限制姿态变化。现实中弯腰不等于发出游戏蹲姿指令。"
+            "现实中蹲下也会让游戏角色蹲下：头部比回中时的站立高度低约 35 厘米即可，站起即恢复。请站立时回中（按住 X）。控制台 vr_physicalCrouchDepth 调整深度，设为 0 关闭。低矮空间、梯子和部分剧情阶段仍会限制姿态变化。"
           ]
         },
         "en": {
@@ -857,7 +857,7 @@
             "Push the right stick firmly down to crouch from standing, then again to go prone. Firm upward pushes step back toward standing.",
             "Return the vertical axis to centre between pushes. Holding a direction briefly can continue one more stance step.",
             "Clicking while crouched or prone requests standing. That held click does not then jump; click again once standing to request a jump.",
-            "Low ceilings, ladders and some scripted sequences restrict stance. Bending physically is separate from issuing an in-game crouch command."
+            "Crouching for real also crouches you in game: drop your head about 35 cm below the height you recentred at, and stand back up to rise. Recentre (hold X) while standing. Console vr_physicalCrouchDepth sets the depth; 0 turns it off. Low ceilings, ladders and some scripted sequences still restrict stance."
           ]
         },
         "zh-TW": {
@@ -5862,7 +5862,7 @@
             "M203：用 Grip 抓住前部弹筒；可开合时也可按住 Trigger 抓持。向前打开，装入后松开 Trigger，再重新抓住弹筒拉回闭合。实弹随筒体移动，空壳脱离弹筒支撑后自然落下。",
             "GP-25：把榴弹送入前方筒口。用 Grip 握住它的辅助握位，再用这只手 Trigger 发射。",
             "下挂霰弹枪：在对应装填位置补弹，用下挂泵动握位完成拉后、推前循环。",
-            "射击下挂武器时要握住它实际的射击握位，再扣该手 Trigger。主枪握把的 Trigger 仍负责主枪。"
+            "射击下挂武器：空闲手用 Grip 握住榴弹筒或霰弹枪泵动握位，再扣该手 Trigger 即可。下挂武器专用的射击握位（掌心朝内握住其扳机处）仍然可用。主枪握把的 Trigger 仍负责主枪。控制台 vr_underbarrelSupportFire 设为 0 可恢复为仅专用握位射击。"
           ]
         },
         "en": {
@@ -5874,7 +5874,7 @@
             "M203: Hold the front tube with Grip, or hold Trigger when the action can move. Slide forward to open. After inserting a round, release Trigger, grasp the tube again and slide it closed. The loaded round follows the tube; a fired case falls naturally once the tube no longer supports it.",
             "GP-25: seat the grenade at the front tube mouth. Grip its support position and fire with that hand’s Trigger.",
             "Underbarrel shotgun: feed its loading contact and cycle its own pump fully back and forward.",
-            "Use the underbarrel’s actual firing grasp and that hand’s Trigger to fire it. Trigger at the main control grip still fires the primary gun."
+            "To fire the underbarrel, hold the launcher tube or shotgun pump with your free hand’s Grip and pull that hand’s Trigger. Its dedicated trigger grasp (palm turned inward at the module trigger) also works. Trigger at the main control grip still fires the primary gun. Console vr_underbarrelSupportFire 0 restores the trigger-grasp-only behaviour."
           ]
         },
         "zh-TW": {
@@ -5886,7 +5886,7 @@
             "M203：用 Grip 抓住前部彈筒；可開合時也可按住 Trigger 抓持。向前打開，裝入後鬆開 Trigger，再重新抓住彈筒拉回閉合。實彈隨筒體移動，空殼脫離彈筒支撐後自然落下。",
             "GP-25：把榴彈送入前方筒口。用 Grip 握住它的輔助握位，再用這只手 Trigger 發射。",
             "下掛霰彈槍：在對應裝填位置補彈，用下掛泵動握位完成拉后、推前循環。",
-            "射擊下掛武器時要握住它實際的射擊握位，再扣該手 Trigger。主槍握把的 Trigger 仍負責主槍。"
+            "射擊下掛武器：空閒手用 Grip 握住榴彈筒或霰彈槍泵動握位，再扣該手 Trigger 即可。下掛武器專用的射擊握位（掌心朝內握住其扳機處）仍然可用。主槍握把的 Trigger 仍負責主槍。控制台 vr_underbarrelSupportFire 設為 0 可恢復為僅專用握位射擊。"
           ]
         },
         "fr": {

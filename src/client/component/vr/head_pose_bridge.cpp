@@ -3,6 +3,7 @@
 #include "head_pose_bridge.hpp"
 #include "camera_rig.hpp"
 #include "roomscale_origin.hpp"
+#include "roomscale_leash.hpp"
 #include "game_view.hpp"
 #include "remote_view.hpp"
 #include "continuous_view_angles.hpp"
@@ -47,6 +48,8 @@ namespace vr::head_pose_bridge
 		game_view::state game_view_state;
 		game_view::camera_rig scripted_camera;
 		game_view::roomscale_origin roomscale;
+		game_view::roomscale_leash leash;
+		float leash_radius_meters{}; // Disabled until the client dvar configures it.
 		game_view::continuous_angles absolute_angles, local_angles;
 		game_view::horizontal_heading local_heading;
 		std::uint64_t game_view_applications{};
@@ -325,6 +328,13 @@ namespace vr::head_pose_bridge
 		}
 	}
 
+	void set_roomscale_leash(const float radius_meters) noexcept
+	{
+		if (!std::isfinite(radius_meters) || radius_meters < 0.0f || radius_meters > 100.0f) return;
+		const std::lock_guard lock(state_mutex);
+		leash_radius_meters = radius_meters;
+	}
+
 	void set_world_scale(const float units_per_meter) noexcept
 	{
 		if (!std::isfinite(units_per_meter) || units_per_meter <= 0.0f || units_per_meter > 10000.0f)
@@ -448,6 +458,7 @@ namespace vr::head_pose_bridge
 		pose_sampled_at = {};
 		game_view_state = {};remote_view_state={};
 		roomscale.reset();
+		leash.reset();
 		roomscale_offset_meters = {};
 		scripted_camera = {};
 		absolute_angles = local_angles = {};
@@ -494,6 +505,7 @@ namespace vr::head_pose_bridge
 		head_filter.reset();tracking_correction={};head_stabilized=false;
 		game_view_state={};remote_view_state={};scripted_camera={};camera_frame_available=false;camera_applied=false;
 		roomscale.reset();
+		leash.reset();
 		roomscale_offset_meters = {};
 		body_estimator.reset();
 	}
@@ -615,11 +627,21 @@ namespace vr::head_pose_bridge
 		vector3 turn_offset_meters{};
 		const bool ordinary = request.policy == game_view::camera_profiles::gameplay &&
 			!request.epoch && !request.position_epoch && !request.entry_epoch;
-		if (!ordinary) roomscale.reset();
+		if (!ordinary) {roomscale.reset();leash.reset();}
 		else if (!roomscale.offset(command_time, recenter_count, base_yaw_axis, head_meters, turn_offset_meters,command_resolved))
 		{
 			camera_applied = false;camera_frame_available = false;
 			++composition_failure_count;return false;
+		}
+		if (ordinary)
+		{
+			// Native collision stays with the player capsule. Bound how far the
+			// camera, hands and body slots may drift from it horizontally.
+			game_view::roomscale_leash::vec displacement=turn_offset_meters;
+			for(unsigned world_axis=0;world_axis<2;++world_axis)for(unsigned i=0;i<3;++i)
+				displacement[world_axis]+=composed.head_offset[i]*base_yaw_axis[i][world_axis];
+			const auto shift=leash.apply(recenter_count,displacement,leash_radius_meters);
+			for(unsigned i=0;i<2;++i)turn_offset_meters[i]+=shift[i];
 		}
 		auto head_offset=composed.head_offset;for(auto& x:head_offset)x*=world_scale;
 		vector3 composed_origin=original_origin;

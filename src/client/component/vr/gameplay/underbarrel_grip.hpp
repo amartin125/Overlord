@@ -65,20 +65,36 @@ namespace vr::gameplay::weapons::underbarrel
 		if(hands::length(hands::sub(delta,hands::scale(axis,axial)))>tolerance.lateral || hands::length(hands::sub(current,previous))>tolerance.step)return {};
 		return {true,std::clamp(initial+axial,0.f,stroke)};
 	}
-	inline contact_role choose_grip(const state& ammo,float travel,float fire_distance,float action_distance,palm_facing palm,float support_radius=.075f)noexcept
+	// closed_shotgun_support: a loaded, closed underbarrel shotgun pump may be
+	// held as module support (like a closed M203) so that hand can fire it.
+	inline contact_role choose_grip(const state& ammo,float travel,float fire_distance,float action_distance,palm_facing palm,float support_radius=.075f,
+		bool closed_shotgun_support=false)noexcept
 	{
 		if(!valid(ammo) || !std::isfinite(travel) || travel<0 || !std::isfinite(support_radius) || support_radius<=0 || support_radius>.5f)return contact_role::none;
 		if(ammo.id.type==kind::gp25)return action_distance>=0 && action_distance<=support_radius?contact_role::support:contact_role::none;
 		const bool fire=fire_distance>=0 && fire_distance<=firing_acquire && firing_facing(palm);
 		const float radius=support_radius;
 		if(!std::isfinite(radius) || radius<=0 || radius>.5f)return contact_role::none;
-		const bool closed_support=ammo.id.type==kind::m203 && !ammo.open && travel<=.001f;
-		const bool action=action_distance>=0 && action_distance<=radius && (ammo.id.type==kind::m203 || !ammo.chamber || ammo.open || travel>.001f) &&
-			(closed_support?support_intent(fire_distance,palm):!fire && std::max(palm.support,palm.firing)>=.258819f);
+		const bool shotgun_support=closed_shotgun_support && ammo.id.type==kind::shotgun && ammo.chamber && !ammo.open && travel<=.001f;
+		const bool closed_support=(ammo.id.type==kind::m203 && !ammo.open && travel<=.001f) || shotgun_support;
+		const bool action=action_distance>=0 && action_distance<=radius && (ammo.id.type==kind::m203 || shotgun_support || !ammo.chamber || ammo.open || travel>.001f) &&
+			(closed_support?support_intent(fire_distance,palm,ammo.id.type):!fire && std::max(palm.support,palm.firing)>=.258819f);
 		// Grasp permission is independent of firing readiness. An open launcher
 		// can be held at its trigger grip but ready() still refuses emission.
 		if(fire && (!action || fire_distance/firing_acquire<=action_distance/radius))return contact_role::firing;
-		return action?(ammo.id.type==kind::m203 && !ammo.open && travel<=.001f?contact_role::support:contact_role::action):contact_role::none;
+		return action?(closed_support?contact_role::support:contact_role::action):contact_role::none;
+	}
+	// Players held the launcher like a foregrip and pulled Trigger; the separate
+	// directional firing grasp (palm turned inward within 40 degrees at a 7.5 cm
+	// contact) was never discovered. Optionally let a held, closed M203 support
+	// or underbarrel-shotgun support/pump grasp fire with that hand's Trigger,
+	// as GP-25 support already does. Native readiness still gates the shot.
+	inline bool support_fire(kind type,contact_role grip,float travel,bool enabled)noexcept
+	{
+		if(!enabled || !std::isfinite(travel) || travel>.001f)return false;
+		if(type==kind::m203)return grip==contact_role::support;
+		if(type==kind::shotgun)return grip==contact_role::support || grip==contact_role::action;
+		return false;
 	}
 	inline palm_facing controller_facing(hands::quat controller_in_gun,int hand)noexcept
 	{

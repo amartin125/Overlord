@@ -118,6 +118,9 @@ namespace vr::head_pose_bridge
 	void configure_target(bool matched) noexcept;
 	void set_enabled(bool enabled) noexcept;
 	void set_world_scale(float units_per_meter) noexcept;
+	// Maximum horizontal camera drift from the native eye in ordinary gameplay;
+	// 0 disables the bound.
+	void set_roomscale_leash(float radius_meters) noexcept;
 	// The runtime adapter decides whether a sample may establish a new origin.
 	// Retaining the reference leaves any initial/manual recenter request pending.
 	enum class reference_policy

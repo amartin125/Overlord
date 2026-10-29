@@ -552,6 +552,11 @@ int main()
 			"loaded closure retains support and permits regrasp at the recorded left-hand orientation");
 		const auto gp=u::import_native({{61,4},62,u::kind::gp25},1,3);
 		check(u::choose_grip(gp,0,.06f,.06f,{0,0},.12f)==u::contact_role::support,"GP25 keeps a single ordinary support/fire grasp");
+		check(u::support_fire(u::kind::m203,u::contact_role::support,0,true) && !u::support_fire(u::kind::m203,u::contact_role::support,0,false) &&
+			!u::support_fire(u::kind::m203,u::contact_role::action,0,true) && !u::support_fire(u::kind::m203,u::contact_role::support,.01f,true) &&
+			!u::support_fire(u::kind::m203,u::contact_role::support,NAN,true) && !u::support_fire(u::kind::gp25,u::contact_role::support,0,true),
+			"held closed M203 support may fire only when enabled; open, moving or pinched tubes may not");
+		check(u::choose_grip(loaded,0,1,.09f,{1,0},.12f,true)==u::contact_role::support,"M203 support capture is unchanged by the shotgun support option");
 		const float stroke=u::authored::m203_stroke;
 		check(u::project_stroke({},{},{stroke,0,0},{1,0,0},0,stroke).travel==stroke,"full forward M203 stroke opens");
 		check(u::project_stroke({stroke,0,0},{stroke,0,0},{},{1,0,0},stroke,stroke).travel==0,"reverse stroke returns the opened M203 fully closed");
@@ -607,6 +612,7 @@ int main()
 		u::classify("scar_h_reflex_shotgun","ak47_shotgun_attach",1,4,4)==u::kind::none,"SCAR optic variant cannot borrow another definition's secondary identity");
 	{
 		const u::identity id{{68,1},69,u::kind::shotgun};const auto loaded=u::import_native(id,4,10);
+		constexpr std::array<float,4> sample_fire{.03069f,.32113f,-.22066f,.95045f};
 		// Live SCAR+reflex samples: correct firing geometry was rejected only
 		// because its variant pair had not entered the module authority.
 		for(const auto sample:std::array<std::array<float,4>,3>{{{.03069f,.32113f,-.22066f,.95045f},{.04588f,.30653f,-.27957f,.95988f},{.05255f,.30079f,-.05910f,.95061f}}})
@@ -619,6 +625,12 @@ int main()
 		check(!u::support_intent(.17f,{-.6f,-.7f},u::kind::shotgun),"outward/downward palm remains outside the support region");
 		const auto empty=u::import_native(id,0,10);
 		check(u::choose_grip(empty,0,.379f,.0412f,{-.26314f,.91367f},.13f)==u::contact_role::action,"captured pump position remains a valid empty-shotgun action grasp");
+		check(loaded.chamber && u::choose_grip(loaded,0,.379f,.0412f,{-.26314f,.91367f},.13f)==u::contact_role::none,"loaded closed pump stays with ordinary carry support unless support fire is enabled");
+		check(u::choose_grip(loaded,0,.379f,.0412f,{-.26314f,.91367f},.13f,true)==u::contact_role::support,"support fire lets a loaded closed pump be held as module support");
+		check(u::choose_grip(empty,0,.379f,.0412f,{-.26314f,.91367f},.13f,true)==u::contact_role::action,"support fire leaves the empty pump as its own action grasp");
+		check(u::choose_grip(loaded,0,sample_fire[0],sample_fire[1],{sample_fire[2],sample_fire[3]},.13f,true)==u::contact_role::firing,"support fire does not change the directional trigger grasp");
+		check(u::support_fire(u::kind::shotgun,u::contact_role::support,0,true) && u::support_fire(u::kind::shotgun,u::contact_role::action,0,true) &&
+			!u::support_fire(u::kind::shotgun,u::contact_role::action,.02f,true),"shotgun support or closed pump grasp may fire; a moving pump may not");
 		using namespace vr::gameplay::hands;
 		const anchor gun{{},{0,0,0,1}};const auto& profile=w::scar::shotgun;const auto& support_anchor=profile.wrists[0];const auto rear=profile.wrists[1].position;
 		check(w::carry::support_contact(profile,gun,support_anchor,rear,add(support_anchor.position,{.12f*40,0,0}),40) &&

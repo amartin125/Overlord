@@ -19,7 +19,7 @@ template<class Check> void controller_stance_tests(Check check)
 	for(bool down:{true,false})
 	{
 		fixture f;f.actual=down?posture::stand:posture::prone;const float y=down?-.9f:.9f;
-		check(f.sample(.4f,y).target==posture::crouch,"90 percent vertical deflection immediately moves one posture level even on a diagonal");
+		check(f.sample(.4f,y).target==posture::crouch,"strong vertical deflection immediately moves one posture level even on a diagonal");
 		check(!f.control.consume(f.input,f.actual,true,f.input.sampled_at,false,false).target,"duplicate command consumption cannot turn immediate crouch into prone");
 		for(int i=0;i<44;++i)check(!f.sample(0,y).target,"continuous hold cannot immediately skip crouch");
 		check(f.sample(0,y).target==(down?posture::prone:posture::stand),"450 ms continuous hold progresses one more accepted native posture");
@@ -31,9 +31,9 @@ template<class Check> void controller_stance_tests(Check check)
 		f.sample(.8f,0);f.sample(.4f,-.9f);
 		check(f.actual==posture::prone && f.requests==2,"two separate pushes descend without waiting for the hold repeat delay");
 	}
-	for(auto axis:{std::array<float,2>{0,-.899f},{.4f,-.899f},{1,0},{.7f,-.7f}})
+	for(auto axis:{std::array<float,2>{0,-.749f},{.4f,-.749f},{1,0},{.7f,-.7f}})
 	{
-		fixture f;for(int i=0;i<200;++i)f.sample(axis[0],axis[1]);check(f.requests==0,"vertical deflection below 90 percent never changes posture regardless of horizontal input");
+		fixture f;for(int i=0;i<200;++i)f.sample(axis[0],axis[1]);check(f.requests==0,"vertical deflection below 75 percent never changes posture regardless of horizontal input");
 		check(f.sample(.4f,-.9f).target==posture::crouch,"turning may transition directly into a vertical stance request without an angle gate");
 	}
 	{
@@ -66,6 +66,42 @@ template<class Check> void controller_stance_tests(Check check)
 		fixture f;f.input.turn_active=false;f.actual=posture::prone;
 		check(f.sample(0,0,10ms,true,true).target==posture::stand,"valid jump click can rise even if the separate turn action is unavailable");
 	}
+	{
+		fixture f;f.sample(0,-.76f);
+		check(f.actual==posture::crouch,"Touch-stick deflection that falls short of 90 percent still crouches");
+	}
+	{
+		physical_crouch p;posture actual=posture::stand;
+		check(!p.consume(true,1,0,.35f,actual),"standing head height never changes posture");
+		check(!p.consume(true,1,-.30f,.35f,actual),"a slight dip above the crouch depth is ignored");
+		check(p.consume(true,1,-.40f,.35f,actual)==posture::crouch && p.low(),"physically crouching below the depth requests native crouch");
+		check(!p.consume(true,1,-.40f,.35f,actual) && p.owns(),"pending native crouch is not repeated or forgotten before it applies");
+		actual=posture::crouch;
+		for(int i=0;i<20;++i)check(!p.consume(true,1,-.42f,.35f,actual),"held physical crouch issues exactly one request");
+		check(!p.consume(true,1,-.30f,.35f,actual),"rise hysteresis keeps crouch near the threshold");
+		check(p.consume(true,1,-.10f,.35f,actual)==posture::stand && !p.low(),"standing up again releases the crouch this adapter caused");
+		actual=posture::stand;
+		check(!p.consume(true,1,0,.35f,actual),"standing remains idle after rising");
+	}
+	{
+		physical_crouch p;posture actual=posture::crouch;
+		check(!p.consume(true,1,-.5f,.35f,actual),"stick crouch already applied: physical crouch requests nothing");
+		check(!p.consume(true,1,0,.35f,actual),"rising never stands up a crouch the stick requested");
+		actual=posture::stand;p.consume(true,1,-.5f,.35f,actual);actual=posture::crouch;p.consume(true,1,-.5f,.35f,actual);
+		actual=posture::prone;p.consume(true,1,-.5f,.35f,actual);
+		check(!p.consume(true,1,0,.35f,actual),"stick prone while physically low is never stood up by rising");
+	}
+	{
+		physical_crouch p;posture actual=posture::stand;
+		check(!p.consume(true,1,-.5f,0,actual),"zero depth disables physical crouch");
+		check(p.consume(true,1,-.5f,.35f,actual)==posture::crouch,"enabling depth acts on the current physical height");
+		check(!p.consume(false,1,-.5f,.35f,actual) && !p.low(),"menus, ladders and scripts clear physical state");
+		check(!p.consume(true,1,std::numeric_limits<float>::quiet_NaN(),.35f,actual),"invalid head height never requests posture");
+		check(p.consume(true,2,-.5f,.35f,actual)==posture::crouch,"a recenter re-evaluates against the new standing height");
+	}
+	check(physical_crouch_view_lift(true,2,40)==20 && physical_crouch_view_lift(true,0,60)==0 &&
+		physical_crouch_view_lift(false,2,40)==0 && physical_crouch_view_lift(true,1,11)==0,
+		"physical crouch lifts only a crouched native eye back to standing height");
 	check(native_posture(1)==posture::prone && native_posture(2)==posture::crouch && native_posture(0)==posture::stand,"native movement flags decode observed stance, not requested stance");
 	check(stance_binding(posture::crouch,0)==101 && stance_binding(posture::crouch,2)==101 && stance_binding(posture::prone,1)==100 &&
 		stance_binding(posture::stand,1)==89 && stance_binding(posture::stand,2)==99 && stance_binding(posture::stand,0)==0,

@@ -16,7 +16,17 @@ generation. One Trigger edge produces at most one request; it cannot fire both
 the host and module.
 
 The module firing grip may be acquired with the same hand's Grip and Trigger
-chord. A squeeze alone does not create a support lease. Existing support,
+chord. A squeeze alone does not create a support lease.
+
+Three testers could not find the directional M203/shotgun firing grasp (palm
+turned inward within 40 degrees at a 7.5 cm contact); they held the launcher
+like a foregrip and pulled Trigger. `vr_underbarrelSupportFire` (saved, on by
+default) also lets the Grip-held, closed M203 support grasp, or an underbarrel
+shotgun support/closed-pump grasp, fire the module with that hand's Trigger, as
+GP-25 support already does. A loaded, closed shotgun pump is then acquired as
+module support instead of ordinary carry support. Open or moving actions,
+Trigger pinches, the control hand's held Trigger and native readiness still
+refuse the shot; the dedicated firing grasp is unchanged. Existing support,
 magazine, action, and module leases remain exclusive. Arbitration reserves a
 new secondary acquisition against conflicting primary-part contacts regardless
 of whether input or rendering evaluates first. A blocked edge cannot replay

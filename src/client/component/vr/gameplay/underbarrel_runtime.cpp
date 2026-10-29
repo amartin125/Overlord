@@ -41,6 +41,8 @@ namespace vr::gameplay::weapons::underbarrel
 		}
 		std::atomic_bool installed{},alive{true};
 		game::dvar_t* smart_ammo_selection{};
+		game::dvar_t* support_fire_dvar{};
+		bool support_fire_enabled()noexcept{return !support_fire_dvar || support_fire_dvar->current.enabled;}
 		bool smart_supply_enabled()noexcept
 		{return smart_ammo_selection ? smart_ammo_selection->current.enabled : settings::smart_ammo_selection.default_value;}
 		std::mutex publication;
@@ -486,7 +488,8 @@ namespace vr::gameplay::weapons::underbarrel
 				                                contact.firing_distance,
 				                                contact.action_distance,
 				                                orientation,
-				                                contact.support_radius);
+				                                contact.support_radius,
+				                                support_fire_enabled());
 				if (chosen == lease::action || chosen == lease::support)
 				{
 					runtime.view.grip = runtime.view.support_role = chosen;
@@ -534,8 +537,10 @@ namespace vr::gameplay::weapons::underbarrel
 			const bool can_fire_from_grip =
 			    contact.type == kind::gp25
 			        ? runtime.view.grip == lease::support && grip_down && hand_available
-			        : runtime.view.grip == lease::firing && squeeze.active && squeeze.down &&
-			              firing_contact && runtime.view.travel <= .001f;
+			        : (runtime.view.grip == lease::firing && squeeze.active && squeeze.down &&
+			              firing_contact && runtime.view.travel <= .001f) ||
+			          (support_fire(contact.type, runtime.view.grip, runtime.view.travel, support_fire_enabled()) &&
+			           runtime.view.maintained == hand_interaction::button::grip && grip_down && hand_available);
 			const auto trigger = route(trigger_pressed && pinch.down,
 			                           false,
 			                           can_fire_from_grip,
@@ -646,7 +651,7 @@ namespace vr::gameplay::weapons::underbarrel
 			s=sample_contact(s,input.input,live->owner,live->gun,input.wrists[s.contact_hand],input.body.head_position,input.body.head_yaw_axis,input.body.units_per_meter,view.travel);
 			if(grip.press && grip.down)
 			{
-				const auto picked=choose_grip(ammo,view.travel,s.firing_distance,s.action_distance,{s.support_facing,s.facing},s.support_radius);
+				const auto picked=choose_grip(ammo,view.travel,s.firing_distance,s.action_distance,{s.support_facing,s.facing},s.support_radius,support_fire_enabled());
 				if(picked!=lease::none)hi::offer({actor,{hi::object(hi::domain::underbarrel,s.owner.id(),0,s.assembly),picked==lease::firing?hi::role::firing:hi::role::foregrip,hi::button::grip,hi::recipe::single,grip_capabilities(s.type,picked)},grip.event,15,picked==lease::firing?s.firing_distance/firing_acquire:s.action_distance/s.support_radius,1,true,true});
 			}
 			if (pinch.press && pinch.down && !ammo.held && live->owner.support == hand::none &&
@@ -1019,6 +1024,8 @@ namespace vr::gameplay::weapons::underbarrel
 		{
 			smart_ammo_selection=dvars::register_bool(settings::smart_ammo_selection.name,settings::smart_ammo_selection.default_value,
 				game::DVAR_FLAG_SAVED,"Automatically choose underbarrel ammunition at the waist when it needs loading; prioritize an absent or empty primary magazine");
+			support_fire_dvar=dvars::register_bool("vr_underbarrelSupportFire",true,game::DVAR_FLAG_SAVED,
+				"Fire a closed M203 or underbarrel shotgun with the Trigger of the hand holding it as support");
 			installed=native::initialize();
 			command::add("vr_underbarrel_status",[]{scheduler::once([]{
 				std::ostringstream out;out<<"ready="<<enabled()<<" smart_ammo="<<smart_supply_enabled()<<" shots="<<shots<<" commits="<<commits<<" rejected="<<rejected<<" reason="<<reason<<'\n';

@@ -59,6 +59,16 @@ older prediction frames from integrating a turn again. Recenter and load reset
 clear the correction; scripted, vehicle and fixed-optic cameras retain their own
 origin policies. `vr_status` reports the applied `roomscale_origin_offset_m`.
 
+Native movement and collision do not follow physical head translation, so a
+player who stepped away from the recenter point saw the world from a position
+their collision capsule did not occupy. `roomscale_leash.hpp` bounds the
+horizontal camera displacement from the native eye to `vr_roomscaleLeash`
+metres (default 0.25, 0 disables) by dragging a persistent world-space shift
+once the head passes the radius. The shift is applied to the camera, hands and
+body slots together, is idempotent for a repeated pose, and resets with
+recenter and non-ordinary camera policies. The core default is disabled; the
+client dvar enables it.
+
 Command and rendering paths use the same `camera_request_for` selection. Fixed
 thermal optics take priority over mounted weapon views, which take priority over
 scripted scenes, followed by ordinary gameplay. Rotation ownership determines

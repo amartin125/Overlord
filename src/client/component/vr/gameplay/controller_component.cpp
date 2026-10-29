@@ -39,6 +39,7 @@
 #include "launcher_runtime.hpp"
 #include <utils/hook.hpp>
 #include <utils/hook_validation.hpp>
+#include <limits>
 
 namespace vr::controllers
 {
@@ -79,6 +80,10 @@ namespace vr::controllers
 		bool driving_inputs{};
 		controller_input::command_buttons buttons;
 		controller_input::stance_gesture stance;
+		controller_input::physical_crouch crouch;
+		game::dvar_t* crouch_depth{};
+		game::dvar_t* roomscale_leash{};
+		std::atomic<std::uint64_t> physical_crouch_count{};
 		bool stance_verified{};
 		constexpr std::uintptr_t execute_binding_address=0x1403CF1E0;
 		constexpr std::uintptr_t native_stance_address=0x141E8A61C;
@@ -267,6 +272,7 @@ namespace vr::controllers
 			if (building_client != 0 || !cmd || !alive.load(std::memory_order_relaxed))
 				return;
 			normal_input_seen = true;
+			if (roomscale_leash) head_pose_bridge::set_roomscale_leash(roomscale_leash->current.value);
 			const auto head = head_pose_bridge::get_status();
 			const auto input = controller_input::latest_interaction();
 			const bool gameplay = enabled && enabled->current.enabled && head.enabled &&
@@ -293,12 +299,23 @@ namespace vr::controllers
 				!(posture_ps->pm_flags&(game::PMF_MANTLE|game::PMF_LADDER));
 			const auto posture_command=stance.consume(input,posture,stance_allowed,now,
 				(button_state.pressed&controller_input::jump_button)!=0,(button_mask&controller_input::jump_button)!=0);
-			if(posture_command.target)
+			// Physical crouch shares the stick's admission and native dispatch; an
+			// explicit stick/click request this command takes priority.
+			const auto physical_target=crouch.consume(stance_allowed,head.recenter_count,
+				head.world_scale>0 ? head.local_position_units[2]/head.world_scale : std::numeric_limits<float>::quiet_NaN(),
+				crouch_depth ? crouch_depth->current.value : 0.f,posture);
+			controller_input::physical_crouch_view=crouch.low();
+			if(posture_command.target || physical_target)
 			{
 				// Reuse H2's own input-stance commands, not playerState writes or
 				// forced pose bits. Native movement retains clearance/script authority.
-				const int binding=controller_input::stance_binding(*posture_command.target,*reinterpret_cast<const int*>(native_stance_address));
-				if(binding){utils::hook::invoke<void>(execute_binding_address,building_client,binding,0,0u);++stance_count;}
+				const auto target=posture_command.target ? *posture_command.target : *physical_target;
+				const int binding=controller_input::stance_binding(target,*reinterpret_cast<const int*>(native_stance_address));
+				if(binding)
+				{
+					utils::hook::invoke<void>(execute_binding_address,building_client,binding,0,0u);++stance_count;
+					if(!posture_command.target)++physical_crouch_count;
+				}
 			}
 			if(posture_command.suppress_jump)button_mask&=~controller_input::jump_button;
 			cmd->buttons |= button_mask; // Never clear a keyboard/native button.
@@ -358,6 +375,7 @@ namespace vr::controllers
 				locomotion.reset();driving_locomotion.reset();
 				buttons.reset();
 				stance.reset();
+				crouch.reset();controller_input::physical_crouch_view=false;
 				story_actions.reset();
 				sentry_placement.reset();
 				firing.reset();
@@ -488,9 +506,12 @@ namespace vr::controllers
 			console::info("[VR input] squeeze_active/down L=%d/%d R=%d/%d\n", input.squeeze[0].active,
 						  input.squeeze[0].down, input.squeeze[1].active, input.squeeze[1].down);
 			const auto* ps=game::CL_IsCgameInitialized()?game::CG_GetPredictedPlayerState(0):nullptr;
-			console::info("[VR input] stance_verified=%d requests=%llu requested=%d actual=%d vertical=0.90 lateral_limit=none dwell_ms=0 repeat_ms=450\n",
+			console::info("[VR input] stance_verified=%d requests=%llu requested=%d actual=%d vertical=%.2f continue=%.2f lateral_limit=none dwell_ms=0 repeat_ms=450\n",
 				stance_verified,stance_count.load(),stance_verified && ps ? *reinterpret_cast<const int*>(native_stance_address):-1,
-					ps ? int(controller_input::native_posture(ps->pm_flags)):-1);
+					ps ? int(controller_input::native_posture(ps->pm_flags)):-1,controller_input::activation_threshold,controller_input::continuation_threshold);
+			console::info("[VR input] physical_crouch depth_m=%.2f low=%d requests=%llu roomscale_leash_m=%.2f\n",
+				crouch_depth ? crouch_depth->current.value : 0.f,controller_input::physical_crouch_view.load(),physical_crouch_count.load(),
+				roomscale_leash ? roomscale_leash->current.value : 0.f);
 			std::ostringstream history_report;
 			diagnostics::append_input_history(history_report,controller_input::get_input_history(),
 				controller_input::clock::now(),"[VR input] ");
@@ -554,6 +575,10 @@ namespace vr::controllers
 									  "Smooth turning speed in degrees per second at full deflection");
 			turn_deadzone = dvars::register_float("vr_turnDeadzone", 0.2f, 0.05f, 0.5f, game::DVAR_FLAG_SAVED,
 												  "Smooth turning stick deadzone");
+			crouch_depth = dvars::register_float("vr_physicalCrouchDepth", 0.35f, 0.0f, 0.8f, game::DVAR_FLAG_SAVED,
+				"Metres below the recentered standing head height that request native crouch; 0 disables");
+			roomscale_leash = dvars::register_float("vr_roomscaleLeash", 0.25f, 0.0f, 2.0f, game::DVAR_FLAG_SAVED,
+				"Maximum horizontal metres the camera may drift from the player's collision body; 0 disables");
 			command::add("vr_input_status", print_status);
 			// Captured H2 keyboard command builder sets/clears usercmd+4 bit 11.
 			// Reject this feature alone if the native input contract has changed.

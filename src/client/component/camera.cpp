@@ -7,6 +7,7 @@
 #include "vr/gameplay/weapon_laser.hpp"
 #include "vr/gameplay/javelin_screen.hpp"
 #include "vr/gameplay/ladder_runtime.hpp"
+#include "vr/gameplay/controller_stance.hpp"
 #include "loader/component_loader.hpp"
 
 #include "game/game.hpp"
@@ -205,6 +206,10 @@ namespace camera
 			}
 			if(ps && !mounted.request.epoch && !sniper.epoch)
 				vr::gameplay::ladders::apply_camera_origin(game::refdef->org,ps->viewHeightCurrent,sequence.linked_entity,game::CG_GetGameTime(0));
+			if(ps && camera_request.policy==vr::game_view::camera_profiles::gameplay && !camera_request.epoch &&
+				!camera_request.position_epoch && !camera_request.entry_epoch)
+				game::refdef->org[2]+=vr::controller_input::physical_crouch_view_lift(
+					vr::controller_input::physical_crouch_view.load(),unsigned(ps->pm_flags),ps->viewHeightCurrent);
 			if (ps && vr::head_pose_bridge::apply_camera(game::refdef->org, game::refdef->axis,
 				camera_command_time, mounted.request.epoch ? mounted.angles.data() : game::cgs->refdefViewAngles,
 				camera_request,&rotation, body_pose_mode && body_pose_mode->current.integer == 1

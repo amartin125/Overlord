@@ -6,12 +6,12 @@ jump action. Left-stick movement and horizontal turning retain their controls.
 
 - Push down: stand to crouch, or crouch to prone. Push up: prone to crouch, or
   crouch to stand. Up while standing does not jump.
-- Activation is immediate at 0.90 vertical magnitude, with no dwell or horizontal
-  angle limit. Only the vertical axis must return to within 0.30 to rearm;
+- Activation is immediate at 0.75 vertical magnitude, with no dwell or horizontal
+  angle limit. Quest/Touch testers routinely missed the former 0.90 threshold. Only the vertical axis must return to within 0.30 to rearm;
   horizontal turning neither blocks acquisition nor consumes this arming.
 - A second neutral-and-push advances another level. Keeping the same direction
   held advances once more after 450 ms, only after native posture confirms the
-  first step. Continuation requires at least 0.75 vertical magnitude, without a
+  first step. Continuation requires at least 0.65 vertical magnitude, without a
   horizontal limit. Each stroke produces at most two requests.
   A request unconfirmed for 1.5 seconds cannot resume later without neutral.
 - Right-stick click while crouched/prone requests stand and suppresses only the
@@ -22,6 +22,24 @@ jump action. Left-stick movement and horizontal turning retain their controls.
 - Pause, focus/tracking loss, reference change, invalid input, ladder, mantling,
   mounted weapons and body-owning scripted actions suppress/reset the gesture.
   Recovery requires neutral; old held input cannot change posture on resumption.
+
+## Physical crouch
+
+Bending down previously lowered only the camera; the native capsule stayed
+standing, so players could not fit under cover. `physical_crouch` now requests
+the native crouch once when the tracked head drops more than
+`vr_physicalCrouchDepth` metres (default 0.35, 0 disables) below the recentered
+standing height, and requests stand when the head rises back within 0.10 m of
+that depth, only if it caused the crouch and the native posture is still crouch.
+It shares the stick's admission, native dispatcher and `stance_binding`; a stick
+or click request in the same command takes priority. It never enters or leaves
+prone. A recenter re-evaluates against the new standing height, so recenter
+while standing.
+
+While the head is physically low, the tracked offset already lowers the camera.
+The camera boundary therefore lifts a crouched native eye back to standing view
+height (60 units) in ordinary gameplay so the view follows the real head instead
+of descending twice. `vr_input_status` reports depth, low state and requests.
 
 ## Native boundary
 
