@@ -136,7 +136,8 @@ namespace memory_log
 		{
 			try
 			{
-				++texture_failures;
+				// The game stops on the first failure; a burst need not all be logged.
+				if (++texture_failures > 20) return;
 				char detail[160]{};
 				std::snprintf(detail, sizeof(detail), " FAILED texture=%llux%llu mips=%llu format=%llu hresult=0x%08llx",
 					static_cast<unsigned long long>(value.width), static_cast<unsigned long long>(value.height),

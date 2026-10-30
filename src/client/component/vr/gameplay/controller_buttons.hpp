@@ -42,8 +42,12 @@ namespace vr::controller_input
 			// click to stay held made sprint stop after a split second on Quest and
 			// PSVR2 sticks, which also blocked the Cliffhanger gap jump.
 			const float forward = input.move_active && std::isfinite(input.move[1]) ? input.move[1] : 0.f;
+			// Like a gamepad, firing, reloading or grabbing with Trigger ends a
+			// latched sprint; a new stick click is needed to sprint again.
+			const bool trigger = (input.trigger[0].active && input.trigger[0].down) ||
+				(input.trigger[1].active && input.trigger[1].down);
 			if ((held & sprint_button) && forward >= sprint_latch_forward) sprint_latched_ = true;
-			else if (forward < sprint_release_forward) sprint_latched_ = false;
+			else if (forward < sprint_release_forward || trigger) sprint_latched_ = false;
 			if (sprint_latched_) held |= sprint_button;
 			// The level gates own admission/rearming for both outputs. A changed
 			// counter from a rejected generation must never become a script event.

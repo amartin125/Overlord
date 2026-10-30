@@ -316,6 +316,11 @@ int main()
 		check(step(false,.9f).held==0,"a click while standing still does not latch sprint");
 		step(true,.9f);step(false,.9f);
 		check(latch.consume(f,false,f.sampled_at).held==0 && step(false,.9f).held==0,"pause or menu clears the latched sprint");
+		step(false,0);step(true,.9f);step(false,.9f);
+		f.trigger[1]={};f.trigger[1].active=f.trigger[1].down=true;
+		check(step(false,.9f).held==0,"pulling a trigger ends a latched sprint like a gamepad");
+		f.trigger[1].down=false;
+		check(step(false,.9f).held==0,"releasing the trigger does not resume sprint without a new click");
 	}
 	sample_buttons(false, true);
 	check(read_buttons() == jump_button && button_result.pressed == jump_button,

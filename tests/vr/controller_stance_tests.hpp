@@ -109,6 +109,18 @@ template<class Check> void controller_stance_tests(Check check)
 		check(!p.consume(true,1,std::numeric_limits<float>::quiet_NaN(),.35f,actual),"invalid head height never requests posture");
 		check(p.consume(true,2,-.5f,.35f,actual)==posture::crouch,"a recenter re-evaluates against the new standing height");
 	}
+	{
+		using namespace std::chrono_literals;
+		physical_crouch p;const auto t=clock::time_point{10s};posture actual=posture::stand;
+		p.consume(true,1,-.5f,.35f,actual,t);actual=posture::crouch;p.consume(true,1,-.5f,.35f,actual,t+100ms);
+		check(p.view_lift(t+100ms),"view is lifted while physically crouched");
+		check(p.consume(true,1,0,.35f,actual,t+200ms)==posture::stand,"rising requests stand");
+		check(p.view_lift(t+700ms),"view stays lifted while the native eye rises, avoiding a dip");
+		check(!p.view_lift(t+1300ms),"lift ends once the native rise has finished");
+		physical_crouch stick;actual=posture::crouch;
+		stick.consume(true,1,-.5f,.35f,actual,t);stick.consume(true,1,0,.35f,actual,t+100ms);
+		check(!stick.view_lift(t+200ms),"rising out of a stick crouch does not hold the lift");
+	}
 	check(physical_crouch_view_lift(true,2,40)==20 && physical_crouch_view_lift(true,0,60)==0 &&
 		physical_crouch_view_lift(false,2,40)==0 && physical_crouch_view_lift(true,1,11)==0,
 		"physical crouch lifts only a crouched native eye back to standing height");

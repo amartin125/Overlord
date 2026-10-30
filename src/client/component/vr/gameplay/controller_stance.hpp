@@ -93,15 +93,21 @@ namespace vr::controller_input
 	class physical_crouch
 	{
 		bool low_{},owns_{},confirmed_{};std::uint64_t reference_{};
+		clock::time_point rose_at_{};
 	public:
 		static constexpr float rise_hysteresis_meters=.10f;
+		// Native eye height animates from crouch to stand after the request.
+		// Keep lifting the view meanwhile, or rising dips the camera ~0.5 m.
+		static constexpr std::chrono::milliseconds rise_view_hold{1000};
+		[[nodiscard]] bool view_lift(clock::time_point now) const noexcept
+		{return low_ || (rose_at_!=clock::time_point{} && now>=rose_at_ && now-rose_at_<rise_view_hold);}
 		void reset() noexcept {*this={};}
 		[[nodiscard]] bool low() const noexcept {return low_;}
 		[[nodiscard]] bool owns() const noexcept {return owns_;}
 		// head_height_meters: tracked head height relative to the recenter pose.
 		// depth_meters <= 0 disables the feature.
 		std::optional<posture> consume(bool gameplay,std::uint64_t reference,float head_height_meters,
-			float depth_meters,posture actual) noexcept
+			float depth_meters,posture actual,clock::time_point now={}) noexcept
 		{
 			if(!gameplay || !reference || actual==posture::unknown || !std::isfinite(head_height_meters) ||
 				!std::isfinite(depth_meters) || depth_meters<=0){reset();return {};}
@@ -123,7 +129,7 @@ namespace vr::controller_input
 				low_=false;
 				const bool rise=owns_ && actual==posture::crouch;
 				owns_=confirmed_=false;
-				if(rise)return posture::stand;
+				if(rise){rose_at_=now;return posture::stand;}
 			}
 			return {};
 		}

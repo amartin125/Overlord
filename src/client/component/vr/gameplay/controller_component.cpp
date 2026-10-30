@@ -303,8 +303,8 @@ namespace vr::controllers
 			// explicit stick/click request this command takes priority.
 			const auto physical_target=crouch.consume(stance_allowed,head.recenter_count,
 				head.world_scale>0 ? head.local_position_units[2]/head.world_scale : std::numeric_limits<float>::quiet_NaN(),
-				crouch_depth ? crouch_depth->current.value : 0.f,posture);
-			controller_input::physical_crouch_view=crouch.low();
+				crouch_depth ? crouch_depth->current.value : 0.f,posture,now);
+			controller_input::physical_crouch_view=crouch.view_lift(now);
 			if(posture_command.target || physical_target)
 			{
 				// Reuse H2's own input-stance commands, not playerState writes or
