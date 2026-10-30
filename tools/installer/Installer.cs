@@ -28,6 +28,10 @@ static class Installer
 			var game = FindGameDirectory();
 			if (game == null) return Finish(1);
 			Console.WriteLine("Game folder: " + game);
+			var installed = File.Exists(Path.Combine(game, "version.json"))
+				? VersionName(File.ReadAllText(Path.Combine(game, "version.json"))) : null;
+			Console.WriteLine("Installed version: " + (installed ?? "unknown"));
+			Console.WriteLine("This installer:    " + (PackagedVersion() ?? "unknown"));
 			Console.WriteLine();
 			Console.WriteLine("  1) Install / update the VR mod (recommended)");
 			Console.WriteLine("  2) Undo the last update");
@@ -53,6 +57,27 @@ static class Installer
 		Console.Write("Press Enter to close.");
 		Console.ReadLine();
 		return code;
+	}
+
+	// version.json is plain {"name": "..."}; avoid a JSON dependency for one field.
+	static string VersionName(string json)
+	{
+		var match = System.Text.RegularExpressions.Regex.Match(json ?? "", "\"name\"\\s*:\\s*\"([^\"]{1,64})\"");
+		return match.Success ? match.Groups[1].Value : null;
+	}
+
+	static string PackagedVersion()
+	{
+		var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("package.zip");
+		if (stream == null) return null;
+		using (stream)
+		using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
+		{
+			var entry = archive.GetEntry("version.json");
+			if (entry == null) return null;
+			using (var reader = new StreamReader(entry.Open()))
+				return VersionName(reader.ReadToEnd());
+		}
 	}
 
 	static bool IsGameDirectory(string directory)
