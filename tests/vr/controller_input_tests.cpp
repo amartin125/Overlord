@@ -145,7 +145,7 @@ int main()
 	check(!read().active, "focus lost");
 	input.focused = true;
 	input.move = {0, 1};
-	check(!read().active, "focus resume needs neutral");
+	check(read().active, "a momentary focus loss does not demand neutral sticks");
 	// Smooth turning integrates command time, not publication count or render FPS.
 	for (const auto rate : {30, 72, 90, 120, 144})
 	{
@@ -191,7 +191,7 @@ int main()
 	(void)smooth.consume(input, true, 0.2f, {}, later);
 	input.turn = {1, 0};
 	input.sampled_at = now + std::chrono::seconds(1);
-	check(!smooth.consume(input, true, 0.2f, {}, input.sampled_at).active,
+	check(smooth.consume(input, true, 0.2f, {}, input.sampled_at).yaw_delta == 0,
 		"long command gap cannot catch up rotation");
 	input.turn = {};
 	(void)smooth.consume(input, true, 0.2f, {}, input.sampled_at);
@@ -202,8 +202,51 @@ int main()
 	input.focused = false;
 	check(!smooth.consume(input, true, 0.2f, {}, input.sampled_at).active, "smooth loses focus");
 	input.focused = true;
+	input.sampled_at += std::chrono::seconds(3);
 	check(!smooth.consume(input, true, 0.2f, {}, input.sampled_at).active,
-		"smooth held resume cannot rotate");
+		"smooth held resume after a long focus loss cannot rotate");
+	{
+		// Checkpoint saves stall frames mid-fight; held sticks must keep working.
+		locomotion walk;frame f{};
+		f.focused = f.move_active = f.turn_active = true;
+		f.sequence = f.reference_generation = 1;f.sampled_at = now;
+		(void)walk.consume(f, true, 0.2f, {}, now);
+		const auto step = [&](std::chrono::milliseconds dt, bool gameplay = true) {
+			f.sampled_at += dt;++f.sequence;return walk.consume(f, gameplay, 0.2f, {}, f.sampled_at);};
+		f.move = {0, 1};
+		check(step(std::chrono::milliseconds(10)).forward > .99f, "armed stick walks forward");
+		f.sampled_at += std::chrono::milliseconds(800);
+		check(!walk.consume(f, true, 0.2f, {}, f.sampled_at + std::chrono::milliseconds(200)).active,
+			"a stale sample during a stall produces no movement");
+		check(step(std::chrono::milliseconds(10)).forward > .99f,
+			"held forward resumes immediately after a short stall such as a checkpoint save");
+		walk.interrupt(f.sampled_at);
+		f.focused = false;check(!step(std::chrono::milliseconds(10)).active, "momentary focus loss stops movement");
+		f.focused = true;
+		check(step(std::chrono::milliseconds(300)).forward > .99f, "held forward resumes after a momentary focus loss");
+		walk.interrupt(f.sampled_at);
+		check(!step(std::chrono::milliseconds(2500)).active, "held stick after a stall longer than two seconds needs neutral");
+		f.move = {};step(std::chrono::milliseconds(10));f.move = {0, 1};
+		check(step(std::chrono::milliseconds(10)).forward > .99f, "neutral re-arms after a long stall");
+		check(!step(std::chrono::milliseconds(10), false).active, "pause or menu stops movement");
+		check(!step(std::chrono::milliseconds(10)).active, "held stick after a pause or menu still needs neutral");
+		f.move = {};step(std::chrono::milliseconds(10));f.move = {0, 1};step(std::chrono::milliseconds(10));
+		walk.interrupt(f.sampled_at);++f.reference_generation;
+		check(!step(std::chrono::milliseconds(10)).active, "a recenter or checkpoint load still needs neutral");
+	}
+	{
+		locomotion snap;frame f{};
+		f.focused = f.move_active = f.turn_active = true;
+		f.sequence = f.reference_generation = 1;f.sampled_at = now;
+		const turn_settings snapping{turn_mode::snap};
+		(void)snap.consume(f, true, 0.2f, snapping, now);
+		f.turn = {1, 0};f.sampled_at += std::chrono::milliseconds(10);++f.sequence;
+		check(snap.consume(f, true, 0.2f, snapping, f.sampled_at).discontinuous_turn, "snap turns once");
+		snap.interrupt(f.sampled_at);
+		f.sampled_at += std::chrono::milliseconds(300);++f.sequence;
+		const auto resumed = snap.consume(f, true, 0.2f, snapping, f.sampled_at);
+		check(resumed.active && !resumed.discontinuous_turn, "a held snap stick does not snap again after a stall");
+	}
 	// Digital actions are independent of analog stick activity/neutral rearming.
 	command_buttons buttons;
 	digital_sampler sprint_sampler, jump_sampler;

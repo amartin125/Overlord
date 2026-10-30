@@ -372,7 +372,9 @@ namespace vr::controllers
 			if (now - last_command > std::chrono::milliseconds(150))
 			{
 				if (local_client==0) gameplay::interaction::command(controller_input::latest_interaction(),false,now);
-				locomotion.reset();driving_locomotion.reset();
+				// A stall such as a checkpoint save keeps held movement; pause,
+				// menus and focus changes still reset through consume().
+				locomotion.interrupt(now);driving_locomotion.reset();
 				buttons.reset();
 				stance.reset();
 				crouch.reset();controller_input::physical_crouch_view=false;

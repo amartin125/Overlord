@@ -59,6 +59,15 @@ register `+sprint` and `+breath_sprint` for the same event receive one canonical
 `+sprint` notice. `vr_input_status` reports `sprint_notifies` beside
 `jump_notifies`; these count submissions, not confirmed script completions.
 
+Movement sticks follow a separate rule. A stall of up to two seconds while
+gameplay continues (stale samples, a gap between commands, or a momentary
+runtime focus loss) lets held sticks resume immediately. Checkpoint saves
+briefly show the runtime's loading scene mid-fight, and demanding that both
+sticks return to centre afterwards left players unable to move. A resumed
+stick never integrates the gap or repeats a held snap turn. Pause, menus,
+longer focus loss and reference changes such as recenter or checkpoint load
+still require neutral sticks.
+
 ## Holding authority and firing
 
 OpenXR analog actions retain their value, availability and suggested source in

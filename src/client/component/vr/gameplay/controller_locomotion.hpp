@@ -38,9 +38,18 @@ namespace vr::controller_input
 				return std::isfinite(axis[0]) && std::isfinite(axis[1]) &&
 					std::abs(axis[0]) <= 1.01f && std::abs(axis[1]) <= 1.01f;
 			};
+			// A stale sample or a momentary runtime focus loss while gameplay
+			// continues is a frame hitch, such as a checkpoint save that briefly
+			// shows the runtime's loading scene, not a pause or menu: keep the
+			// short resume window. Longer dashboard use expires it.
+			if (gameplay && input.sequence != 0 && input.sampled_at <= now &&
+				(!input.focused || now - input.sampled_at > std::chrono::milliseconds(150)))
+			{
+				interrupt(now);
+				return result;
+			}
 			if (!gameplay || !input.focused || !input.move_active || !input.turn_active ||
 				input.sequence == 0 || input.sampled_at > now ||
-				now - input.sampled_at > std::chrono::milliseconds(150) ||
 				!finite_axis(input.move) || !finite_axis(input.turn) ||
 				!std::isfinite(deadzone) || deadzone < 0.05f || deadzone > 0.5f ||
 				!std::isfinite(turning.snap_degrees) || turning.snap_degrees < 5.0f || turning.snap_degrees > 90.0f ||
@@ -53,12 +62,13 @@ namespace vr::controller_input
 				return result;
 			}
 			if (generation_ != input.reference_generation || input.sequence < sequence_ ||
-				mode_ != turning.mode || (armed_ && (now < last_consumed_ ||
-					now - last_consumed_ > std::chrono::milliseconds(150))))
+				mode_ != turning.mode || (armed_ && now < last_consumed_))
 			{
 				reset();
 				generation_ = input.reference_generation;
 			}
+			else if (armed_ && now - last_consumed_ > std::chrono::milliseconds(150))
+				interrupt(now);
 			mode_ = turning.mode;
 			const auto elapsed = armed_ ? std::clamp(std::chrono::duration<float>(now - last_consumed_).count(),
 				0.0f, 0.05f) : 0.0f;
@@ -68,7 +78,16 @@ namespace vr::controller_input
 			if (!armed_)
 			{
 				armed_ = magnitude <= deadzone && std::hypot(input.turn[0], input.turn[1]) <= turning.deadzone;
-				return result;
+				// Checkpoint saves and other brief stalls showed the runtime's
+				// loading screen mid-fight; demanding both sticks return to centre
+				// afterwards left players unable to move until they let go.
+				const bool resume = !armed_ && resume_generation_ == generation_ && now <= resume_until_;
+				resume_until_ = {};
+				if (!resume)
+					return result;
+				armed_ = true;
+				// A held snap-turn stick must be released before snapping again.
+				if (std::abs(input.turn[0]) >= 0.25f) turn_latched_ = true;
 			}
 			result.active = true;
 			if (magnitude > deadzone)
@@ -107,9 +126,28 @@ namespace vr::controller_input
 			armed_ = false;
 			turn_latched_ = false;
 			sequence_ = 0;
+			resume_until_ = {};
 		}
 
+		// Brief interruption of command or input flow while gameplay continued.
+		// Held sticks may resume within the window; pause, focus loss, menus and
+		// reference changes still call reset() and require neutral sticks.
+		void interrupt(const clock::time_point now) noexcept
+		{
+			if (armed_)
+			{
+				resume_until_ = now + hitch_resume;
+				resume_generation_ = generation_;
+			}
+			armed_ = false;
+			sequence_ = 0;
+		}
+
+		static constexpr std::chrono::milliseconds hitch_resume{2000};
+
 	private:
+		clock::time_point resume_until_{};
+		std::uint64_t resume_generation_{};
 		bool armed_{};
 		bool turn_latched_{};
 		std::uint64_t sequence_{};
