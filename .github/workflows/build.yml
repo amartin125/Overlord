@@ -110,12 +110,14 @@ jobs:
         run: |
           $package = Get-ChildItem output/packages -Recurse -Filter *.zip | Select-Object -First 1
           New-Item -ItemType Directory -Force output/installer | Out-Null
+          # csc.exe reads '/' as an option prefix, so pass Windows paths.
           & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:exe /optimize+ `
-            /out:output/installer/Overlord-Installer.exe /win32manifest:tools/installer/app.manifest `
+            "/out:output\installer\Overlord-Installer.exe" "/win32manifest:tools\installer\app.manifest" `
             "/resource:$($package.FullName),package.zip" `
             /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll `
-            tools/installer/Installer.cs
+            "tools\installer\Installer.cs"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path output\installer\Overlord-Installer.exe)) { throw "Installer was not produced" }
 
       - name: Upload one-click installer
         if: matrix.configuration == 'RelWithDebInfo'
