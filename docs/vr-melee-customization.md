@@ -18,6 +18,14 @@ before profile execution. The launcher also reads the engine's hashed form
 | `ending` | 终局之刃 | Clean H2 ending knife, ordinary chest-equipment lifecycle. |
 | `bloody` | 血腥之刃 | Bloody H2 ending knife, ordinary chest-equipment lifecycle. |
 
+The `h2_vr_melee` fastfile (about 28 MB of baton, karambit and ending-knife
+models) is loaded with the common zones only when one of those custom choices
+is saved; `default` and `ghost` use the game's own `h2_viewmodel_knife`. The pack
+stays resident for the session, and an 8 GB GPU in a dense mission (No Russian)
+then failed `Create2DTexture` with `E_OUTOFMEMORY`. Choosing a custom knife
+takes effect from the next game start; until the pack is loaded, the chest
+slot waits for the model exactly as it does for any missing native resource.
+
 Every named choice overrides Green Beret's chest/waist melee substitution.
 Other Green Beret inventory/ammunition rules remain native. The setting does
 not affect mission-owned climbing tools. Endgame's admitted scripted sequence

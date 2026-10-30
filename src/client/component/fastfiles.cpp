@@ -9,12 +9,14 @@
 #include "mods.hpp"
 #include "fonts.hpp"
 #include "imagefiles.hpp"
+#include "vr/settings.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/concurrency.hpp>
 #include <utils/string.hpp>
 #include <utils/io.hpp>
 #include <utils/startup_callbacks.hpp>
+#include <algorithm>
 
 namespace fastfiles
 {
@@ -192,6 +194,21 @@ namespace fastfiles
 			fonts::load_font_zones();
 		}
 
+		// Baton, karambit and the ending knives need a 28 MB pack of models; the
+		// default and Ghost knives use the game's own h2_viewmodel_knife. Load the
+		// pack only for a custom choice: it stays resident for the whole session
+		// and pushed 8 GB GPUs into Create2DTexture failures in heavy missions.
+		bool custom_melee_selected()
+		{
+			const auto& setting = vr::settings::melee_weapon;
+			const auto* value = game::Dvar_FindVar(setting.name);
+			// Choices are default, ghost, then the custom models; values ends at nullptr.
+			const auto choices = static_cast<int>(std::count_if(setting.values.begin(), setting.values.end(),
+				[](const char* v) { return v != nullptr; }));
+			return value && value->type == game::dvar_type::enumeration &&
+				value->current.integer >= 2 && value->current.integer < choices;
+		}
+
 		void load_post_gfx_and_ui_and_common_zones(game::XZoneInfo* zone_info, 
 			unsigned int zone_count, game::DBSyncMode sync_mode)
 		{
@@ -216,7 +233,8 @@ namespace fastfiles
 			}
 
 				try_add_zone(zones, allocator, "h2_vr_sounds", false);
-			try_add_zone(zones, allocator, "h2_vr_melee", false);
+			if (custom_melee_selected())
+				try_add_zone(zones, allocator, "h2_vr_melee", false);
 			try_add_zone(zones, allocator, "h2_vr_tracers", false);
 			add_mod_zones(zones, allocator, mods::zone_priority::post_common);
 
