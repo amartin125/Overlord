@@ -57,5 +57,9 @@ namespace d3d11::texture_diagnostics
 		std::uint64_t eye, ID3D11DeviceContext* context, const void* source = nullptr,
 		const void* destination = nullptr, const void* command = nullptr) noexcept;
 	void capture(snapshot& output) noexcept;
+	// Optional observer for failed CreateTexture2D calls, run on the failing
+	// thread after the failure is recorded. Used by the memory log.
+	using failure_observer = void (*)(const event&) noexcept;
+	void set_failure_observer(failure_observer observer) noexcept;
 	[[nodiscard]] std::string format_recent(std::size_t limit = capacity);
 }

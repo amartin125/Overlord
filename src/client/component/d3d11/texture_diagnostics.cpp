@@ -80,9 +80,12 @@ namespace d3d11::texture_diagnostics
 			return active_capacity;
 		}
 
+		std::atomic<failure_observer> observer{};
+
 		void record_failure(const event& value) noexcept
 		{
 			++failures;
+			if (const auto notify = observer.load(std::memory_order_acquire)) notify(value);
 			if (first_failure.writing.test_and_set(std::memory_order_acquire)) { ++dropped; return; }
 			const auto device_error = [](const std::uint64_t code)
 			{
@@ -347,6 +350,11 @@ namespace d3d11::texture_diagnostics
 			first_failure.writing.clear(std::memory_order_release);
 		}
 		else ++output.skipped;
+	}
+
+	void set_failure_observer(const failure_observer value) noexcept
+	{
+		observer.store(value, std::memory_order_release);
 	}
 
 	std::string format_recent(const std::size_t limit)

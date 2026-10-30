@@ -80,7 +80,7 @@ headset acceptance where those boundaries matter.
 
 | Purpose | Guides |
 | --- | --- |
-| Capture and acceptance | [Diagnostics workflow](vr-diagnostics-workflow.md), [region performance capture](vr-region-capture.md), [render performance review](vr-render-performance-review.md), [equipment visibility capture](vr-equipment-visibility-capture.md), [interaction diagnostics](vr-interaction-diagnostics.md) |
+| Capture and acceptance | [Diagnostics workflow](vr-diagnostics-workflow.md), [region performance capture](vr-region-capture.md), [render performance review](vr-render-performance-review.md), [equipment visibility capture](vr-equipment-visibility-capture.md), [interaction diagnostics](vr-interaction-diagnostics.md), [memory log (temporary)](vr-memory-log.md) |
 | Weapon faults | [HK slap diagnostics](vr-hk-slap-diagnostics.md), [held-weapon ejection audit](vr-ejection-reference-audit.md) ([structured data](vr-ejection-reference-audit.json)) |
 | Native and asset audits | [Optics feasibility](vr-optic-rendering-feasibility.md), [Estate weapon variants](vr-estate-weapon-audit.md), [Oilrig weapon variants](vr-oilrig-weapon-audit.md) |
 
