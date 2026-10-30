@@ -6,13 +6,16 @@ jump action. Left-stick movement and horizontal turning retain their controls.
 
 - Push down: stand to crouch, or crouch to prone. Push up: prone to crouch, or
   crouch to stand. Up while standing does not jump.
-- Activation is immediate at 0.75 vertical magnitude, with no dwell or horizontal
-  angle limit. Quest/Touch testers routinely missed the former 0.90 threshold. Only the vertical axis must return to within 0.30 to rearm;
+- Activation is immediate at 0.75 vertical magnitude, with no dwell. Quest/Touch
+  testers routinely missed the former 0.90 threshold. The push must also be
+  mostly vertical (|y| >= 1.5 |x|, about 34 degrees either side of straight
+  down/up): with the lower threshold, diagonal turning in combat crouched and,
+  after the hold delay, went prone, leaving players briefly unable to move. Only the vertical axis must return to within 0.30 to rearm;
   horizontal turning neither blocks acquisition nor consumes this arming.
 - A second neutral-and-push advances another level. Keeping the same direction
   held advances once more after 450 ms, only after native posture confirms the
-  first step. Continuation requires at least 0.65 vertical magnitude, without a
-  horizontal limit. Each stroke produces at most two requests.
+  first step. Continuation requires at least 0.65 vertical magnitude and the same
+  vertical dominance. Each stroke produces at most two requests.
   A request unconfirmed for 1.5 seconds cannot resume later without neutral.
 - Right-stick click while crouched/prone requests stand and suppresses only the
   VR jump bit for that click's entire hold. This prevents jumping as soon as the

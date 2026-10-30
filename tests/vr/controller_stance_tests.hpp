@@ -70,6 +70,16 @@ template<class Check> void controller_stance_tests(Check check)
 		fixture f;f.sample(0,-.76f);
 		check(f.actual==posture::crouch,"Touch-stick deflection that falls short of 90 percent still crouches");
 	}
+	for(auto axis:{std::array<float,2>{.7f,-.8f},{-.75f,-.75f},{.6f,-.85f},{1,-.8f}})
+	{
+		fixture f;for(int i=0;i<200;++i)f.sample(axis[0],axis[1]);
+		check(f.requests==0,"diagonal turning below horizontal never crouches or goes prone");
+	}
+	{
+		fixture f;f.sample(.3f,-.9f);check(f.actual==posture::crouch,"a mostly vertical push with some sideways drift still crouches");
+		for(int i=0;i<100;++i)f.sample(.8f,-.7f);
+		check(f.actual==posture::crouch && f.requests==1,"drifting into a turn while held cannot continue from crouch to prone");
+	}
 	{
 		physical_crouch p;posture actual=posture::stand;
 		check(!p.consume(true,1,0,.35f,actual),"standing head height never changes posture");

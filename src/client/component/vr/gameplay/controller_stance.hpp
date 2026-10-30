@@ -28,6 +28,12 @@ namespace vr::controller_input
 	// Quest/Touch sticks rarely report a clean 90 percent vertical deflection
 	// while the thumb also rolls sideways; testers routinely missed crouch.
 	inline constexpr float activation_threshold=.75f,continuation_threshold=.65f;
+	// Turning in a fight held the stick diagonally below horizontal, which the
+	// lower thresholds read as crouch and, after the hold delay, prone. Stance
+	// input must be clearly vertical: within about 34 degrees of straight up/down.
+	inline constexpr float vertical_dominance=1.5f;
+	inline bool vertical_stroke(float x,float y,float threshold) noexcept
+	{return std::abs(y)>=threshold && std::abs(y)>=vertical_dominance*std::abs(x);}
 	class stance_gesture
 	{
 		bool armed_{},suppress_jump_{};int direction_{};unsigned steps_{};
@@ -63,13 +69,13 @@ namespace vr::controller_input
 			const auto at=input.sampled_at;
 			if(!direction_)
 			{
-				if(y<activation_threshold)return {};
+				if(!vertical_stroke(input.turn[0],y,activation_threshold))return {};
 				direction_=direction;steps_=1;issued_at_=at;
 				const auto target=step_posture(actual,direction_);expected_=target.value_or(actual);
 				if(!target)steps_=2;
 				return {target,false};
 			}
-			if(direction!=direction_ || y<continuation_threshold){clear_stroke();return {};}
+			if(direction!=direction_ || !vertical_stroke(input.turn[0],y,continuation_threshold)){clear_stroke();return {};}
 			// Continue only after the native game actually accepted the first
 			// step. A blocked stance cannot queue a later surprise transition.
 			if(at-issued_at_>std::chrono::milliseconds(1500))steps_=2;
