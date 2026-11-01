@@ -226,8 +226,11 @@ namespace vr::settings
 		const char* label;
 		std::array<float, hand_alignment.size()> values;
 	};
+	// Quest 2 players reported guns sitting too far forward with no offset. The
+	// back value is a starting point from that feedback, not measured anatomy.
 	inline constexpr std::array alignment_presets{
-	    alignment_preset{"none", "None", {0, 0, 0, 0, 0, 0}}};
+	    alignment_preset{"none", "None", {0, 0, 0, 0, 0, 0}},
+	    alignment_preset{"quest2", "Meta Quest 2", {0, .04f, 0, 0, 0, 0}}};
 	// Application calibration in OpenXR grip coordinates, independent of the
 	// retained legacy settings. Both banks default to no position or angle
 	// adjustment in their own frame; zero does not add a hidden wrist baseline.

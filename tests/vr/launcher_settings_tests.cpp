@@ -561,15 +561,21 @@ int main(int argc, char** argv)
 		for (bool standard : {false, true})
 		{
 			const auto presets = controller_presets(standard);
-			require(presets.size() == 1 && presets[0]["id"] == "none" && presets[0]["label"] == "None",
-				"Both calibration banks expose only the shared None preset");
+			require(presets.size() == 2 && presets[0]["id"] == "none" && presets[0]["label"] == "None" &&
+				presets[1]["id"] == "quest2",
+				"Both calibration banks expose the shared None preset first, then Meta Quest 2");
 			const auto& fields = standard ? vr::settings::standard_hand_alignment : vr::settings::hand_alignment;
 			for (const auto& field : fields)
 				require(initial[field.name] == 0 && presets[0]["values"][field.name] == 0,
 					"New profiles and None must zero all six alignment fields in both banks");
-			auto candidate = initial;
-			candidate.update(presets[0]["values"]);
-			require(validate(candidate), "Every compiled preset must pass the normal save validation");
+			for (const auto& preset : presets)
+			{
+				auto candidate = initial;
+				candidate.update(preset["values"]);
+				require(validate(candidate), "Every compiled preset must pass the normal save validation");
+			}
+			const auto back = standard ? vr::settings::standard_hand_alignment[1].name : vr::settings::hand_back.name;
+			require(presets[1]["values"][back] == .04, "Quest 2 preset pulls the wrist 4 cm back in either bank");
 		}
 		require(initial[vr::settings::aim_assist_strength.name] == 0, "VR aim assist must default off");
 		require(vr::settings::aim_assist_degrees(0) == 0 && vr::settings::aim_assist_degrees(50) == 5 &&
