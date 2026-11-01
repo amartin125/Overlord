@@ -1,6 +1,9 @@
 #pragma once
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
+#include <cstdint>
 
 namespace vr::gameplay::npc_collision
 {
@@ -35,4 +38,23 @@ namespace vr::gameplay::npc_collision
 	// the full-sized environment sweep; a failed sweep keeps the native answer.
 	template<class Trace> Trace pass_through(const Trace& original,const Trace& environment) noexcept
 	{return valid(original) && valid(environment) ? environment : original;}
+	// Hostile actors refreshed on the game thread and read lock-free by the
+	// movement trace. Pass-through applies to friendlies and neutrals only, so
+	// enemies keep blocking the player instead of being walked through.
+	class actor_set
+	{
+		static constexpr unsigned words=63; // Entity numbers below 4032.
+		std::array<std::atomic<std::uint64_t>,words> bits_{};
+	public:
+		static constexpr unsigned capacity=words*64;
+		template<class Range> void publish(const Range& entities) noexcept
+		{
+			std::array<std::uint64_t,words> next{};
+			for (const unsigned entity:entities) if (entity<capacity) next[entity/64]|=std::uint64_t{1}<<(entity%64);
+			for (unsigned i=0;i<words;++i) bits_[i].store(next[i],std::memory_order_relaxed);
+		}
+		void clear() noexcept {for (auto& word:bits_) word.store(0,std::memory_order_relaxed);}
+		[[nodiscard]] bool contains(unsigned entity) const noexcept
+		{return entity<capacity && (bits_[entity/64].load(std::memory_order_relaxed)>>(entity%64)&1u);}
+	};
 }

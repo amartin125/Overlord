@@ -7,6 +7,9 @@
 #include "component/console.hpp"
 #include "component/scheduler.hpp"
 #include "game/dvars.hpp"
+#include "game/scripting/array.hpp"
+#include "game/scripting/entity.hpp"
+#include "game/scripting/execution.hpp"
 #include "loader/component_loader.hpp"
 #include <utils/hook.hpp>
 #include <utils/hook_validation.hpp>
@@ -18,7 +21,32 @@ namespace vr::gameplay::npc_collision
 	{
 		game::dvar_t* enabled{};
 		game::dvar_t* pass_through_enabled{};
-		std::atomic_uint64_t passed_through{};
+		std::atomic_uint64_t passed_through{},hostile_blocks{},hostile_refreshes{};
+		actor_set hostiles;
+		void refresh_hostiles()
+		{
+			if (!game::CL_IsCgameInitialized() || !*game::levelEntityId) {hostiles.clear();return;}
+			try
+			{
+				const auto targets=scripting::call<scripting::array>("getaiarray",{"bad_guys"});
+				const auto count=targets.size();
+				if (count<0 || count>static_cast<int>(actor_set::capacity)) return;
+				std::vector<unsigned> entities;entities.reserve(static_cast<std::size_t>(count));
+				for (int i=0;i<count;++i)
+				{
+					const auto value=targets.get(i);
+					if (!value.is<scripting::entity>()) continue;
+					const auto ref=value.as<scripting::entity>().get_entity_reference();
+					if (ref.classnum==0) entities.push_back(ref.entnum);
+				}
+				hostiles.publish(entities);
+				++hostile_refreshes;
+			}
+			catch (...)
+			{
+				hostiles.clear();
+			}
+		}
 		std::atomic_bool installed{};
 		std::array<std::atomic_uint64_t,2> candidates{},adjustments{};
 		std::atomic_uint64_t environment_blocks{},rejected{};
@@ -49,9 +77,12 @@ namespace vr::gameplay::npc_collision
 			++candidates[handler];
 			const auto original=*result;
 			game::trace_t contact{},environment{};
-			if (pass_through_enabled && pass_through_enabled->current.enabled)
+			const bool hostile=hostiles.contains(result->hitId);
+			if (hostile) ++hostile_blocks;
+			if (pass_through_enabled && pass_through_enabled->current.enabled && !hostile)
 			{
-				// Player movement ignores NPC bodies but keeps every wall and prop.
+				// Player movement ignores friendly/neutral NPC bodies but keeps every
+				// wall, prop and enemy (enemies use the reduced-core policy below).
 				query(&environment,bounds,mask&~int(actor_contents));
 				*result=pass_through(original,environment);
 				if (result->fraction!=original.fraction || result->startsolid!=original.startsolid) ++passed_through;
@@ -76,9 +107,10 @@ namespace vr::gameplay::npc_collision
 	}
 	std::string status()
 	{
-		return std::format("[VR NPC collision] installed={} enabled={} pass_through={} player_radius={} actor_candidates={}/{} adjusted={}/{} passed_through={} environment_blocks={} rejected={}\n",
+		return std::format("[VR NPC collision] installed={} enabled={} pass_through={} player_radius={} actor_candidates={}/{} adjusted={}/{} passed_through={} hostile_contacts={} hostile_refreshes={} environment_blocks={} rejected={}\n",
 			installed.load(),enabled && enabled->current.enabled,pass_through_enabled && pass_through_enabled->current.enabled,player_radius,
-			candidates[0].load(),candidates[1].load(),adjustments[0].load(),adjustments[1].load(),passed_through.load(),environment_blocks.load(),rejected.load());
+			candidates[0].load(),candidates[1].load(),adjustments[0].load(),adjustments[1].load(),passed_through.load(),hostile_blocks.load(),
+			hostile_refreshes.load(),environment_blocks.load(),rejected.load());
 	}
 	class component final:public component_interface
 	{
@@ -86,7 +118,8 @@ namespace vr::gameplay::npc_collision
 		{
 			enabled=dvars::register_bool("vr_closeNpcCollision",true,game::DVAR_FLAG_SAVED,"Closer player/NPC contact while retaining native environment clearance");
 			pass_through_enabled=dvars::register_bool("vr_npcPassThrough",true,game::DVAR_FLAG_SAVED,
-				"Let the player move through NPC bodies (needs vr_closeNpcCollision); walls and props still block");
+				"Let the player move through friendly and neutral NPC bodies (needs vr_closeNpcCollision); enemies, walls and props still block");
+			scheduler::loop(refresh_hostiles,scheduler::pipeline::server,std::chrono::milliseconds(250));
 			constexpr std::uint8_t entry[]{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x10,0x48,0x89,0x74,0x24,0x18};
 			constexpr std::uint8_t first[]{0xe8,0x0f,0x01,0,0},retry[]{0xe8,0x64,0,0,0},general[]{0xe8,0x09,0,0,0};
 			// Read-only live witness: both PM_playerTrace calls and PM_trace pass

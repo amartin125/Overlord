@@ -262,6 +262,15 @@ int main()
 	check(npc_collision::pass_through(original,clear).fraction==1,"pass-through lets the player walk out of an NPC overlap");
 	check(npc_collision::pass_through(original,wall).fraction==.5f && npc_collision::pass_through(original,{0,true,true}).allsolid,"pass-through keeps walls and environment overlap blocking");
 	check(npc_collision::pass_through(original,{std::numeric_limits<float>::quiet_NaN()}).fraction==original.fraction,"invalid pass-through sweep retains the native answer");
+	{
+		npc_collision::actor_set hostiles;
+		hostiles.publish(std::array<unsigned,4>{1,63,64,4031});
+		check(hostiles.contains(1) && hostiles.contains(63) && hostiles.contains(64) && hostiles.contains(4031),"published enemies are recognised");
+		check(!hostiles.contains(2) && !hostiles.contains(4032) && !hostiles.contains(100000),"other and out-of-range entities are not enemies");
+		hostiles.publish(std::array<unsigned,1>{2});
+		check(!hostiles.contains(1) && hostiles.contains(2),"a refresh replaces the previous enemy list");
+		hostiles.clear();check(!hostiles.contains(2),"clearing forgets every enemy");
+	}
 	check((weapons::muzzle_clearance_mask&int(npc_collision::actor_contents))==0 &&
 		(weapons::muzzle_clearance_mask&0x2000000)!=0,"muzzle clearance ignores NPC contents but retains the cover layer");
 	std::cout<<"melee failures="<<failures<<'\n';return failures ? 1 : 0;
