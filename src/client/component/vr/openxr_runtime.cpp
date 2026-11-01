@@ -20,6 +20,7 @@
 #include "pose_filter.hpp"
 #include "legacy_controller_pose.hpp"
 #include "engine_scene_resolution.hpp"
+#include "comfort_vignette.hpp"
 #include "movie_presentation.hpp"
 #include "presentation_options.hpp"
 
@@ -176,6 +177,8 @@ namespace vr::openxr
 		std::uint64_t owner_generation_{};
 		std::uint32_t owner_thread_{};
 		float pause_dim_{};
+		float comfort_vignette_{};
+		std::chrono::steady_clock::time_point comfort_updated_{};
 		XrTime reference_change_{};
 		bool cylinder_supported_{};
 		DXGI_FORMAT menu_format_{};
@@ -1639,6 +1642,15 @@ namespace vr::openxr
 			}
 			else
 			{
+				if (index == 0)
+				{
+					const auto now = std::chrono::steady_clock::now();
+					const float seconds = comfort_updated_ == std::chrono::steady_clock::time_point{} ? 0.f :
+						std::chrono::duration<float>(now - comfort_updated_).count();
+					comfort_vignette_ = comfort_vignette::approach(comfort_vignette_,
+						pause_dim_ > 0 ? 0.f : comfort_vignette::target.load(), seconds);
+					comfort_updated_ = now;
+				}
 				const texture_blit::renderer::draw_request transfer{
 				    .graphics = graphics_,
 				    .source = source,
@@ -1646,7 +1658,8 @@ namespace vr::openxr
 				    .width = eye.width,
 				    .height = eye.height,
 				    .source_encoding = texture_blit::encoding::linear,
-				    .dim = pause_dim_};
+				    .dim = pause_dim_,
+				    .vignette = comfort_vignette_};
 				if (!blit_.draw(transfer, error))
 				{
 					result = XR_ERROR_RUNTIME_FAILURE;

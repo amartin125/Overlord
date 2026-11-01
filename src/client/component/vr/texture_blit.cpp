@@ -31,7 +31,8 @@ cbuffer Parameters : register(b0)
 {
     uint mode;
     float dim;
-    uint2 padding;
+    float vignette;
+    uint padding;
 };
 // Values match texture_blit::encoding sent through Parameters.
 static const uint SOURCE_LINEAR = 0;
@@ -49,7 +50,11 @@ float4 main(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
     float4 color = source.Sample(sampling, uv);
     if (mode == SOURCE_LINEAR)
-        return float4(color.rgb * (1 - dim), color.a);
+    {
+        // Comfort vignette: darken only the outer field, fully at the corners.
+        float edge = saturate((length((uv - 0.5) * 2) - 0.55) / 0.5);
+        return float4(color.rgb * (1 - dim) * (1 - vignette * edge), color.a);
+    }
 
     float alpha = mode == SOURCE_ENCODED_OPAQUE ? 1 : color.a;
     float3 encoded = color.rgb;
@@ -146,7 +151,7 @@ float4 main(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	}
 	bool renderer::draw(const draw_request& request, std::string& error)
 	{
-		const auto& [graphics, source, destination, width, height, format, dim] = request;
+		const auto& [graphics, source, destination, width, height, format, dim, vignette] = request;
 		if (!graphics || !source || !destination || !width || !height || width > 8192 || height > 8192)
 		{
 			error = "invalid texture blit arguments";
@@ -207,9 +212,12 @@ float4 main(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 		{
 			unsigned mode;
 			float dim;
-			unsigned padding[2];
+			float vignette;
+			unsigned padding;
 		} parameters{
-		    static_cast<unsigned>(format), std::isfinite(dim) ? std::clamp(dim, 0.f, 1.f) : 0.f, {0, 0}};
+		    static_cast<unsigned>(format), std::isfinite(dim) ? std::clamp(dim, 0.f, 1.f) : 0.f,
+		    std::isfinite(vignette) ? std::clamp(vignette, 0.f, 1.f) : 0.f, 0};
+		static_assert(sizeof(parameters) == 16);
 		deferred_->ClearState();
 		deferred_->UpdateSubresource(parameters_.Get(), 0, nullptr, &parameters, 0, 0);
 		const float blend[4]{};

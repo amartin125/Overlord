@@ -72,3 +72,13 @@ checks pointer selection, register preservation, flags, and native value retenti
 WARP tests compare sharp/blurred pixels and menu-mask bypass; compositor tests
 cover HUD exclusion and menu retention. Lua tests cover hiding and restoring
 independent ammunition sources. In-game VR/HMD acceptance is separate.
+
+## Comfort vignette
+
+`vr_comfortVignette` (saved, 0–1, default 0 = off) darkens the outer field of
+view while the movement stick is deflected or the view is turned with the
+stick, a common VR comfort aid. The strength scales with stick deflection,
+turning applies it fully, and it fades in over about 0.15 s and out over about
+0.35 s (`comfort_vignette.hpp`). It is applied in the OpenXR eye transfer
+shader (`texture_blit`), so only the default OpenXR backend shows it; physical
+walking, vehicles, scripted control and pause menus never darken the view.

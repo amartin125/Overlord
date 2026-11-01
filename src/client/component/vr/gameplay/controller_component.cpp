@@ -28,6 +28,7 @@
 #include "controller_locomotion.hpp"
 #include "../remote_look.hpp"
 #include "../roomscale_walk.hpp"
+#include "../comfort_vignette.hpp"
 #include "controller_stance.hpp"
 #include "game/dvars.hpp"
 #include "game/game.hpp"
@@ -85,6 +86,7 @@ namespace vr::controllers
 		game::dvar_t* crouch_depth{};
 		game::dvar_t* roomscale_leash{};
 		game::dvar_t* roomscale_walk{};
+		game::dvar_t* comfort_vignette_strength{};
 		std::atomic<std::uint64_t> roomscale_walk_commands{};
 		constexpr float walk_deadzone_meters=.12f, walk_max_fraction=.6f;
 		std::atomic<std::uint64_t> physical_crouch_count{};
@@ -247,6 +249,7 @@ namespace vr::controllers
 			// Optional physical walking: with the movement stick idle, a step
 			// beyond the deadzone requests movement toward the head. The stick
 			// always wins, and native collision decides how far the body goes.
+			bool walking_now{};
 			if(!driving && gameplay && can_move && movement.active && movement.forward==0 && movement.right==0 &&
 				roomscale_walk && roomscale_walk->current.enabled && roomscale_leash)
 			{
@@ -258,11 +261,18 @@ namespace vr::controllers
 						roomscale_leash->current.value,walk_max_fraction);
 					if(walk.active())
 					{
-						movement.forward=walk.forward;movement.right=walk.right;
+						movement.forward=walk.forward;movement.right=walk.right;walking_now=true;
 						head_pose_bridge::note_roomscale_walk();++roomscale_walk_commands;
 					}
 				}
 			}
+			// Comfort vignette follows deliberate stick motion only; physical
+			// walking and scripted/vehicle control never darken the view.
+			comfort_vignette::target=!driving && gameplay && movement.active && comfort_vignette_strength
+				? comfort_vignette::target_for(comfort_vignette_strength->current.value,
+					comfort_vignette::motion_amount(walking_now ? 0.f : movement.forward,walking_now ? 0.f : movement.right,
+						can_turn && movement.yaw_delta!=0))
+				: 0.f;
 			if (!movement.active)
 				return;
 			const auto add_axis = [](const char original, const float axis) {
@@ -400,7 +410,7 @@ namespace vr::controllers
 				locomotion.interrupt(now);driving_locomotion.reset();
 				buttons.reset();
 				stance.reset();
-				crouch.reset();controller_input::physical_crouch_view=false;
+				crouch.reset();controller_input::physical_crouch_view=false;comfort_vignette::target=0.f;
 				story_actions.reset();
 				sentry_placement.reset();
 				firing.reset();
@@ -604,6 +614,8 @@ namespace vr::controllers
 				"Metres below the recentered standing head height that request native crouch; 0 disables");
 			roomscale_leash = dvars::register_float("vr_roomscaleLeash", 0.25f, 0.0f, 2.0f, game::DVAR_FLAG_SAVED,
 				"Maximum horizontal metres the camera may drift from the player's collision body; 0 disables");
+			comfort_vignette_strength = dvars::register_float("vr_comfortVignette", 0.0f, 0.0f, 1.0f, game::DVAR_FLAG_SAVED,
+				"Darken the edges of view while moving or turning with the sticks (OpenXR); 0 disables");
 			roomscale_walk = dvars::register_bool("vr_roomscaleWalk", false, game::DVAR_FLAG_SAVED,
 				"Move the character toward your head when you physically step (needs vr_roomscaleLeash > 0.12)");
 			command::add("vr_input_status", print_status);
