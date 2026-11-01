@@ -69,6 +69,18 @@ body slots together, is idempotent for a repeated pose, and resets with
 recenter and non-ordinary camera policies. The core default is disabled; the
 client dvar enables it.
 
+`vr_roomscaleWalk` (saved, default off) adds optional physical walking on top
+of the leash. With the movement stick idle, a camera offset beyond 0.12 m asks
+native movement to walk toward the head, ramping to 60% stick speed at the
+leash radius (`roomscale_walk.hpp`). While a walk request is fresh, the bridge
+measures the native eye's horizontal motion between frames and removes the
+part toward the camera from the leash drag (`roomscale_leash::compensate`), so
+the view stays with the head while the body catches up. Motion away from the
+head, motion beyond the current offset and jumps over 0.5 m are never absorbed,
+so a blocked body, knockback or a teleport cannot run away or push the view.
+The stick always takes priority and native collision decides how far the body
+moves. Leaning past the deadzone also moves the body, which is why it is opt-in.
+
 Command and rendering paths use the same `camera_request_for` selection. Fixed
 thermal optics take priority over mounted weapon views, which take priority over
 scripted scenes, followed by ordinary gameplay. Rotation ownership determines

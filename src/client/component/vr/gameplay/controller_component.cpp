@@ -27,6 +27,7 @@
 #include "optic_runtime.hpp"
 #include "controller_locomotion.hpp"
 #include "../remote_look.hpp"
+#include "../roomscale_walk.hpp"
 #include "controller_stance.hpp"
 #include "game/dvars.hpp"
 #include "game/game.hpp"
@@ -83,6 +84,9 @@ namespace vr::controllers
 		controller_input::physical_crouch crouch;
 		game::dvar_t* crouch_depth{};
 		game::dvar_t* roomscale_leash{};
+		game::dvar_t* roomscale_walk{};
+		std::atomic<std::uint64_t> roomscale_walk_commands{};
+		constexpr float walk_deadzone_meters=.12f, walk_max_fraction=.6f;
 		std::atomic<std::uint64_t> physical_crouch_count{};
 		bool stance_verified{};
 		constexpr std::uintptr_t execute_binding_address=0x1403CF1E0;
@@ -239,6 +243,25 @@ namespace vr::controllers
 				movement.right=std::clamp(movement.right+physical.steering,-1.f,1.f);
 				movement.forward=gameplay::vehicles::merge_driver_throttle(movement.forward,physical.throttle);
 				movement.active=movement.active || physical.steering!=0 || physical.throttle!=0;
+			}
+			// Optional physical walking: with the movement stick idle, a step
+			// beyond the deadzone requests movement toward the head. The stick
+			// always wins, and native collision decides how far the body goes.
+			if(!driving && gameplay && can_move && movement.active && movement.forward==0 && movement.right==0 &&
+				roomscale_walk && roomscale_walk->current.enabled && roomscale_leash)
+			{
+				head_pose_bridge::vector3 offset{};
+				const auto* ps=game::CG_GetPredictedPlayerState(0);
+				if(ps && head_pose_bridge::roomscale_walk_target(offset))
+				{
+					const auto walk=game_view::walk_input(offset,ps->viewangles[1],walk_deadzone_meters,
+						roomscale_leash->current.value,walk_max_fraction);
+					if(walk.active())
+					{
+						movement.forward=walk.forward;movement.right=walk.right;
+						head_pose_bridge::note_roomscale_walk();++roomscale_walk_commands;
+					}
+				}
 			}
 			if (!movement.active)
 				return;
@@ -511,9 +534,9 @@ namespace vr::controllers
 			console::info("[VR input] stance_verified=%d requests=%llu requested=%d actual=%d vertical=%.2f continue=%.2f lateral_limit=none dwell_ms=0 repeat_ms=450\n",
 				stance_verified,stance_count.load(),stance_verified && ps ? *reinterpret_cast<const int*>(native_stance_address):-1,
 					ps ? int(controller_input::native_posture(ps->pm_flags)):-1,controller_input::activation_threshold,controller_input::continuation_threshold);
-			console::info("[VR input] physical_crouch depth_m=%.2f low=%d requests=%llu roomscale_leash_m=%.2f\n",
+			console::info("[VR input] physical_crouch depth_m=%.2f low=%d requests=%llu roomscale_leash_m=%.2f roomscale_walk=%d walk_commands=%llu\n",
 				crouch_depth ? crouch_depth->current.value : 0.f,controller_input::physical_crouch_view.load(),physical_crouch_count.load(),
-				roomscale_leash ? roomscale_leash->current.value : 0.f);
+				roomscale_leash ? roomscale_leash->current.value : 0.f,roomscale_walk && roomscale_walk->current.enabled,roomscale_walk_commands.load());
 			std::ostringstream history_report;
 			diagnostics::append_input_history(history_report,controller_input::get_input_history(),
 				controller_input::clock::now(),"[VR input] ");
@@ -581,6 +604,8 @@ namespace vr::controllers
 				"Metres below the recentered standing head height that request native crouch; 0 disables");
 			roomscale_leash = dvars::register_float("vr_roomscaleLeash", 0.25f, 0.0f, 2.0f, game::DVAR_FLAG_SAVED,
 				"Maximum horizontal metres the camera may drift from the player's collision body; 0 disables");
+			roomscale_walk = dvars::register_bool("vr_roomscaleWalk", false, game::DVAR_FLAG_SAVED,
+				"Move the character toward your head when you physically step (needs vr_roomscaleLeash > 0.12)");
 			command::add("vr_input_status", print_status);
 			// Captured H2 keyboard command builder sets/clears usercmd+4 bit 11.
 			// Reject this feature alone if the native input contract has changed.

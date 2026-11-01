@@ -1,5 +1,6 @@
 #pragma once
 #include "component/vr/roomscale_leash.hpp"
+#include "component/vr/roomscale_walk.hpp"
 #include <cmath>
 #include <limits>
 
@@ -31,5 +32,31 @@ template<class Check> void roomscale_leash_tests(Check check)
 		check(leash.apply(2,{2,0,0},0)==roomscale_leash::vec{},"zero radius disables the leash");
 		check(leash.apply(0,{2,0,0},.25f)==roomscale_leash::vec{},"missing reference applies no shift");
 		check(leash.apply(2,{std::numeric_limits<float>::quiet_NaN(),0,0},.25f)==roomscale_leash::vec{},"invalid displacement applies no shift");
+	}
+	{
+		using vr::game_view::walk_input;
+		check(!walk_input({.05f,0,0},0,.12f,.25f,.6f).active(),"small leans inside the deadzone never walk");
+		const auto ahead=walk_input({.25f,0,0},0,.12f,.25f,.6f);
+		check(std::abs(ahead.forward-.6f)<1e-4f && std::abs(ahead.right)<1e-4f,"a step straight ahead walks forward at the capped speed");
+		const auto left=walk_input({0,.25f,0},0,.12f,.25f,.6f);
+		check(std::abs(left.right+.6f)<1e-4f && std::abs(left.forward)<1e-4f,"a step to the left walks left (+y is left)");
+		const auto turned=walk_input({0,.25f,0},90,.12f,.25f,.6f);
+		check(std::abs(turned.forward-.6f)<1e-4f,"the step direction follows the native view yaw");
+		const auto partial=walk_input({.185f,0,0},0,.12f,.25f,.6f);
+		check(partial.forward>.29f && partial.forward<.31f,"speed ramps between the deadzone and the leash radius");
+		check(!walk_input({.3f,0,0},0,.12f,0,.6f).active() && !walk_input({NAN,0,0},0,.12f,.25f,.6f).active(),
+			"walking needs a valid leash radius and displacement");
+	}
+	{
+		roomscale_leash leash;leash.apply(1,{0,0,0},.25f);
+		const roomscale_leash::vec head{.2f,0,0};
+		leash.compensate(1,head,{.05f,0,0});
+		check(std::abs(camera(head,leash.shift())-.15f)<1e-4f,"body motion toward the head is absorbed so the view stays put");
+		leash.compensate(1,head,{-.05f,0,0});
+		check(std::abs(camera(head,leash.shift())-.15f)<1e-4f,"motion away from the head is never absorbed");
+		leash.compensate(1,head,{1.f,0,0});
+		check(camera(head,leash.shift())<1e-4f,"absorption never overshoots the current offset");
+		leash.compensate(2,head,{.05f,0,0});
+		check(camera(head,leash.shift())<1e-4f,"a stale reference cannot compensate");
 	}
 }

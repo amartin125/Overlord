@@ -50,6 +50,12 @@ namespace vr::head_pose_bridge
 		game_view::roomscale_origin roomscale;
 		game_view::roomscale_leash leash;
 		float leash_radius_meters{}; // Disabled until the client dvar configures it.
+		// Physical walking: previous native eye for body-motion compensation and
+		// the latest camera offset from it, published to the command thread.
+		vector3 walk_previous_eye{}, walk_displacement{};
+		bool walk_has_previous{}, walk_has_target{};
+		std::uint64_t walk_reference{};
+		std::chrono::steady_clock::time_point walk_sampled_at{}, walk_requested_at{};
 		game_view::continuous_angles absolute_angles, local_angles;
 		game_view::horizontal_heading local_heading;
 		std::uint64_t game_view_applications{};
@@ -335,6 +341,22 @@ namespace vr::head_pose_bridge
 		leash_radius_meters = radius_meters;
 	}
 
+	bool roomscale_walk_target(vector3& displacement) noexcept
+	{
+		const std::lock_guard lock(state_mutex);
+		const auto now=std::chrono::steady_clock::now();
+		if (!walk_has_target || !enabled || recenter_pending || now<walk_sampled_at ||
+			now-walk_sampled_at>std::chrono::milliseconds(150)) return false;
+		displacement=walk_displacement;
+		return true;
+	}
+
+	void note_roomscale_walk() noexcept
+	{
+		const std::lock_guard lock(state_mutex);
+		walk_requested_at=std::chrono::steady_clock::now();
+	}
+
 	void set_world_scale(const float units_per_meter) noexcept
 	{
 		if (!std::isfinite(units_per_meter) || units_per_meter <= 0.0f || units_per_meter > 10000.0f)
@@ -459,6 +481,7 @@ namespace vr::head_pose_bridge
 		game_view_state = {};remote_view_state={};
 		roomscale.reset();
 		leash.reset();
+		walk_has_previous = walk_has_target = false;
 		roomscale_offset_meters = {};
 		scripted_camera = {};
 		absolute_angles = local_angles = {};
@@ -506,6 +529,7 @@ namespace vr::head_pose_bridge
 		game_view_state={};remote_view_state={};scripted_camera={};camera_frame_available=false;camera_applied=false;
 		roomscale.reset();
 		leash.reset();
+		walk_has_previous = walk_has_target = false;
 		roomscale_offset_meters = {};
 		body_estimator.reset();
 	}
@@ -627,7 +651,7 @@ namespace vr::head_pose_bridge
 		vector3 turn_offset_meters{};
 		const bool ordinary = request.policy == game_view::camera_profiles::gameplay &&
 			!request.epoch && !request.position_epoch && !request.entry_epoch;
-		if (!ordinary) {roomscale.reset();leash.reset();}
+		if (!ordinary) {roomscale.reset();leash.reset();walk_has_previous=walk_has_target=false;}
 		else if (!roomscale.offset(command_time, recenter_count, base_yaw_axis, head_meters, turn_offset_meters,command_resolved))
 		{
 			camera_applied = false;camera_frame_available = false;
@@ -640,8 +664,21 @@ namespace vr::head_pose_bridge
 			game_view::roomscale_leash::vec displacement=turn_offset_meters;
 			for(unsigned world_axis=0;world_axis<2;++world_axis)for(unsigned i=0;i<3;++i)
 				displacement[world_axis]+=composed.head_offset[i]*base_yaw_axis[i][world_axis];
+			const auto now=std::chrono::steady_clock::now();
+			if (walk_has_previous && walk_reference==recenter_count &&
+				now-walk_requested_at<std::chrono::milliseconds(200))
+			{
+				// Body motion caused by a walking request is absorbed; a jump larger
+				// than half a metre is a teleport or load and never compensated.
+				const game_view::roomscale_leash::vec motion{(original_origin[0]-walk_previous_eye[0])/world_scale,
+					(original_origin[1]-walk_previous_eye[1])/world_scale,0};
+				if (std::hypot(motion[0],motion[1])<.5f) leash.compensate(recenter_count,displacement,motion);
+			}
+			walk_previous_eye=original_origin;walk_has_previous=true;walk_reference=recenter_count;
 			const auto shift=leash.apply(recenter_count,displacement,leash_radius_meters);
 			for(unsigned i=0;i<2;++i)turn_offset_meters[i]+=shift[i];
+			walk_displacement={displacement[0]+shift[0],displacement[1]+shift[1],0};
+			walk_has_target=leash_radius_meters>0;walk_sampled_at=now;
 		}
 		auto head_offset=composed.head_offset;for(auto& x:head_offset)x*=world_scale;
 		vector3 composed_origin=original_origin;

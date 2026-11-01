@@ -121,6 +121,11 @@ namespace vr::head_pose_bridge
 	// Maximum horizontal camera drift from the native eye in ordinary gameplay;
 	// 0 disables the bound.
 	void set_roomscale_leash(float radius_meters) noexcept;
+	// Physical walking: the latest horizontal camera offset from the native eye
+	// in ordinary gameplay (world metres), if fresh, and a notice that a command
+	// requested walking toward it so the body's catch-up is absorbed.
+	[[nodiscard]] bool roomscale_walk_target(vector3& displacement) noexcept;
+	void note_roomscale_walk() noexcept;
 	// The runtime adapter decides whether a sample may establish a new origin.
 	// Retaining the reference leaves any initial/manual recenter request pending.
 	enum class reference_policy
