@@ -876,6 +876,12 @@ namespace vr::openxr
 				width = (std::max)(width, view.recommendedImageRectWidth);
 				height = (std::max)(height, view.recommendedImageRectHeight);
 			}
+			{
+				const auto reduced = engine_scene_resolution::scaled({width, height},
+					engine_scene_resolution::render_scale.load());
+				width = reduced.width;
+				height = reduced.height;
+			}
 			for (auto& view : view_configs_)
 			{
 				if (width > view.maxImageRectWidth || height > view.maxImageRectHeight)

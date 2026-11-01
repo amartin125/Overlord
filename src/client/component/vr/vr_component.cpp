@@ -23,6 +23,7 @@
 #include "engine_stereo_resource_ops.hpp"
 #include "engine_stereo_renderer.hpp"
 #include "engine_view_probe.hpp"
+#include "engine_scene_resolution.hpp"
 #include "head_pose_bridge.hpp"
 #include "native_menu.hpp"
 #include "vr_runtime.hpp"
@@ -55,6 +56,7 @@ namespace vr
 		game::dvar_t* vr_engine_probe_trace{};
 		game::dvar_t* vr_head_tracking{};
 		game::dvar_t* vr_world_scale{};
+		game::dvar_t* vr_render_scale{};
 		game::dvar_t* vr_engine_swap_eyes{};
 		game::dvar_t* vr_desktop_fov{};
 		game::dvar_t* vr_desktop_eye{};
@@ -755,6 +757,8 @@ namespace vr
 				engine_stereo_bridge::set_world_scale(vr_world_scale->current.value);
 				head_pose_bridge::set_world_scale(vr_world_scale->current.value);
 			}
+			if (vr_render_scale != nullptr)
+				engine_scene_resolution::render_scale.store(vr_render_scale->current.value);
 			engine_stereo_bridge::set_swap_eyes(vr_engine_swap_eyes != nullptr &&
 				vr_engine_swap_eyes->current.enabled);
 
@@ -831,6 +835,9 @@ namespace vr
 			vr_world_scale = dvars::register_float(settings::world_scale.name, settings::world_scale.default_value,
 				settings::world_scale.min, settings::world_scale.max, game::DVAR_FLAG_SAVED,
 				"Game units per VR meter for head tracking and stereo; apply with vr_reinit");
+			vr_render_scale = dvars::register_float("vr_renderScale", 1.0f, engine_scene_resolution::min_render_scale, 1.0f,
+				game::DVAR_FLAG_SAVED,
+				"Fraction of the headset's recommended per-eye resolution to render; lower saves GPU memory; apply with vr_reinit");
 			vr_engine_swap_eyes = dvars::register_bool("vr_engineSwapEyes", false, game::DVAR_FLAG_SAVED,
 				"Swap the engine stereo left and right eye assignment; apply with vr_reinit");
 			vr_desktop_fov = dvars::register_float("vr_desktopFov", desktop_mirror::default_horizontal_fov,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
@@ -18,6 +20,22 @@ namespace vr::engine_scene_resolution
 	{
 		return size.width > 0 && size.height > 0 &&
 			size.width <= 16384 && size.height <= 16384;
+	}
+
+	// Optional player render scale, applied to the runtime's recommended eye
+	// size before the scene is requested. It only ever lowers the resolution, to
+	// relieve GPUs with little memory (8 GB cards failed Create2DTexture in dense
+	// missions). Sizes stay even; values outside [0.5, 1) leave the size unchanged.
+	inline constexpr float min_render_scale = .5f;
+	inline std::atomic<float> render_scale{1.f};
+	inline extent scaled(const extent size, const float scale) noexcept
+	{
+		if (!std::isfinite(scale) || scale < min_render_scale || scale >= 1.f || !valid(size)) return size;
+		const auto even = [scale](std::uint32_t value) {
+			const auto result = static_cast<std::uint32_t>(std::lround(value * scale / 2.0)) * 2u;
+			return result < 2u ? 2u : result;
+		};
+		return {even(size.width), even(size.height)};
 	}
 
 	// H2 0x14074F670 calculates these fields; 0x1407502D0 stores them in

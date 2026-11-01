@@ -831,8 +831,10 @@ namespace vr::openvr
 				return fail(runtime_state::runtime_unavailable, "GetRecommendedRenderTargetSize", -1,
 					"recommended eye dimensions are outside the H2/D3D11 limits; no clamping is permitted");
 			}
-			const auto width = recommended_width;
-			const auto height = recommended_height;
+			const auto reduced = engine_scene_resolution::scaled({recommended_width, recommended_height},
+				engine_scene_resolution::render_scale.load());
+			const auto width = reduced.width;
+			const auto height = reduced.height;
 			for (auto& eye : status_.eyes)
 			{
 				eye.width = width;
