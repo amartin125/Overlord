@@ -36,6 +36,10 @@ The suppressor may supply the rifle muzzle; an underbarrel never does.
   A fresh offhand trigger press chooses the closer wrist orientation and keeps
   that pose for the stroke; release before acquiring the other pose. The rear
   right hand stays on the grip. Short strokes do not feed or extract a round.
+  A press made up to `vr_partGrabGrace` ms (default 250, 0 off) before the hand
+  reaches within 4 cm of the handle still grabs it while that press stays held,
+  if no other interaction took the press. This shared slide/bolt rule never
+  grabs a magazine or waist supply, and a longer hold never grabs on entry.
 - A tactical reload preserves the chamber and permits 30+1. Unclaimed dropped
   magazine rounds return to reserve unless `vr_discardAmmoPenalty` is enabled;
   a held magazine released at the waist recovers its contents either way.

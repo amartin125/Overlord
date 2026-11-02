@@ -20,6 +20,7 @@ using vr::hand;
 #include "roomscale_leash_tests.hpp"
 #include "render_scale_tests.hpp"
 #include "comfort_vignette_tests.hpp"
+#include "part_press_grace_tests.hpp"
 #include "controller_ads_tests.hpp"
 #include "vehicle_locomotion_tests.hpp"
 #include "remote_look_tests.hpp"
@@ -48,6 +49,7 @@ int main()
 	roomscale_leash_tests(check);
 	render_scale_tests(check);
 	comfort_vignette_tests(check);
+	part_press_grace_tests(check);
 	controller_ads_tests(check);
 	vehicle_locomotion_tests(check);
 	remote_look_tests(check);

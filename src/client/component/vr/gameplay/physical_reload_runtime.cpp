@@ -22,6 +22,7 @@
 #include "reload_item_runtime.hpp"
 #include "reload_item_compatibility.hpp"
 #include "magazine_release_motion.hpp"
+#include "part_press_grace.hpp"
 #include "component/command.hpp"
 #include "component/console.hpp"
 #include "component/scheduler.hpp"
@@ -42,7 +43,13 @@ namespace vr::gameplay::weapons::physical_reload
 		std::atomic<unsigned> boundaries{};
 		std::atomic_bool alive{true};
 		game::dvar_t* enabled{};
+		game::dvar_t* grab_grace{};
 		std::mutex mutex;
+		// Per free hand: its latest Trigger press, and the weapon a late slide
+		// grab was offered for in the current interaction batch.
+		std::array<part_press_grace,2> late_press{};
+		std::array<weapon_identity,2> late_offer{};
+		int grace_ms() noexcept { return grab_grace ? grab_grace->current.integer : default_grace_ms; }
 		scene_frame last_published_scene{}; // Diagnostics never drive mechanics.
 		instance_cache<scene_frame,carry::inventory::capacity> scenes;
 		struct instance
@@ -272,12 +279,16 @@ namespace vr::gameplay::weapons::physical_reload
 			const bool diagnose=debug_options::enabled(debug_options::probe::weapon_events);
 			const bool was_busy = diagnose && value->gesture.offhand_busy(value->view.ammo);
 			auto rules=value->view.definition->ammunition;rules.discard_penalty=reload_items::discard_penalty();
+			// A granted late slide grab stands in for the earlier, still-held press.
+			const auto free_hand=hand(1-int(scene.owner.holding_hand()));
+			const bool late_grab=late_offer[unsigned(free_hand)]==scene.owner.id() &&
+				hand_interaction::granted(free_hand,hand_interaction::domain::magazine,scene.owner.id(),hand_interaction::button::trigger,hand_interaction::role::part);
 			value->gesture.update(value->view.definition->interaction, rules, value->view.ammo, scene.input,
 				value->view.owner, contact, scene.gameplay && scene.owner.id() == observed.ammo.id(), now,
 				[&](const auto& tx) { return commit(*value, tx); }, {scene.manipulation,
 				hand_interaction::granted(hand(1-int(scene.owner.holding_hand())),hand_interaction::domain::magazine,scene.owner.id()),
 				hand_interaction::granted(hand(1-int(scene.owner.holding_hand())),hand_interaction::domain::magazine,scene.owner.id(),hand_interaction::button::trigger,hand_interaction::role::supply),
-				hand_interaction::input(hand(1-int(scene.owner.holding_hand())),hand_interaction::button::trigger).press,
+				hand_interaction::input(hand(1-int(scene.owner.holding_hand())),hand_interaction::button::trigger).press || late_grab,
 				hand_interaction::granted(hand(1-int(scene.owner.holding_hand())),hand_interaction::domain::magazine,scene.owner.id(),hand_interaction::button::trigger,hand_interaction::role::part),hand_interaction::input(hand(1-int(scene.owner.holding_hand())),hand_interaction::button::trigger).release,
 				hand_interaction::granted(hand(1-int(scene.owner.holding_hand())),hand_interaction::domain::magazine,scene.owner.id(),hand_interaction::button::trigger,hand_interaction::role::supply),
 				hand_interaction::input(hand(1-int(scene.owner.holding_hand())),hand_interaction::button::grip).release,
@@ -435,6 +446,7 @@ namespace vr::gameplay::weapons::physical_reload
 	{
 		namespace hi=hand_interaction;
 		const wait_timing::scoped_lock lock(mutex, wait_timing::site::reload_other);
+		const auto now=clock::now();late_offer={};
 		for(const auto& entry:scenes.entries())if(entry.id)
 		{
 			auto s=entry.value;const auto* live=input.find(entry.id);if(!live || !valid_hand(live->owner.holding_hand()))continue;
@@ -443,7 +455,10 @@ namespace vr::gameplay::weapons::physical_reload
 			const auto grip=hi::input(actor,hi::button::grip);
 			const bool support_catch=s.definition && s.definition->interaction.support_magazine_catch &&
 				live->owner.can_fire() && live->owner.support==actor && release.press && grip.down && !grip.release && edge.down && !edge.release;
-			if(!support_catch && (!edge.press || !edge.down))continue;
+			auto& late=late_press[unsigned(actor)];
+			if(edge.press && edge.down)late.press(edge.event,now,grace_ms());
+			const bool late_entry=!support_catch && !edge.press && late.late(edge.event,edge.down,edge.release,now);
+			if(!support_catch && (!edge.press || !edge.down) && !late_entry)continue;
 			const auto* value=find(entry.id);auto view=value?value->view:presentation{};
 			if (!view.active)
 			{
@@ -466,6 +481,20 @@ namespace vr::gameplay::weapons::physical_reload
 					g.seated_hand_distance>p.part_release_distance || g.attached_magazine_pose>=p.magazine_pose_count)continue;
 				hi::offer({actor,{hi::object(hi::domain::magazine,entry.id,0,s.assembly),hi::role::supply,hi::button::trigger,hi::recipe::single,{}},
 					release.event,10,0,1,true,true,hi::object(hi::domain::carry,entry.id,1)});
+				continue;
+			}
+			if(late_entry)
+			{
+				// Same held press, now at the handle itself: offer only the slide or
+				// bolt, never a magazine, belt or waist draw, and never a busy hand.
+				const bool knife=s.contact.knife_held;
+				if(!view.active || view.fault || view.part_leased() || view.ammo.magazine_hand!=hand::none || p.belt ||
+					(knife && s.definition->knife_slide_grips.empty()) ||
+					(p.manual_magazine && p.manual_magazine->prefer_grasp_facing && g.magazine_facing) ||
+					!(g.slide_distance<=std::min(p.slide_radius,late_grab_radius_m)))continue;
+				late_offer[unsigned(actor)]=entry.id;
+				hi::offer({actor,{hi::object(hi::domain::magazine,entry.id,0,s.assembly),hi::role::part,hi::button::trigger,
+					knife?hi::recipe::knife_part:hi::recipe::single,{}},edge.event,20u,g.slide_distance/p.slide_radius,1,true,true});
 				continue;
 			}
 			float part=g.slide_distance/p.slide_radius;
@@ -723,6 +752,8 @@ namespace vr::gameplay::weapons::physical_reload
 		{
 			enabled = dvars::register_bool("vr_physicalReload", true, game::DVAR_FLAG_SAVED,
 				"Authored weapon physical magazine/chamber/slide interaction; intermediate saves unsupported");
+			grab_grace = dvars::register_int("vr_partGrabGrace", default_grace_ms, 0, max_grace_ms, game::DVAR_FLAG_SAVED,
+				"Milliseconds a free-hand Trigger pressed just before reaching a slide or bolt handle still grabs it while held (0 off)");
 			command::add("vr_reload_interaction_status", [] {
 				// Snapshot under the gameplay lock; formatting/console/I/O must not
 				// block scene publication or the authoritative simulation callback.
