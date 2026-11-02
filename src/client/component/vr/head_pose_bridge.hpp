@@ -148,7 +148,7 @@ namespace vr::head_pose_bridge
 	[[nodiscard]] bool apply_game_view(float* native_angles, const float* delta_angles,
 		std::uint64_t scripted_epoch = 0, bool remote = false) noexcept;
 	[[nodiscard]] bool apply_remote_control(std::array<std::int8_t,2>& command,std::array<float,2> rates,
-		std::array<float,2> stick,int command_time,std::uint64_t epoch)noexcept;
+		std::array<float,2> stick,int command_time,std::uint64_t epoch,bool head_aim=true)noexcept;
 	void suspend_remote_view()noexcept;
 	void record_game_command(int command_time, int packed_pitch = 0, bool tracked = false) noexcept;
 	[[nodiscard]] bool resolve_game_pitch(int command_time, int packed_pitch,

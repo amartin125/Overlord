@@ -563,13 +563,13 @@ namespace vr::head_pose_bridge
 	void suspend_remote_view()noexcept
 	{const std::lock_guard lock(state_mutex);remote_view_state.suspend();}
 	bool apply_remote_control(std::array<std::int8_t,2>& command,std::array<float,2> rates,
-		std::array<float,2> stick,int command_time,std::uint64_t epoch)noexcept
+		std::array<float,2> stick,int command_time,std::uint64_t epoch,bool head_aim)noexcept
 	{
 		const std::lock_guard lock(state_mutex);const auto now=std::chrono::steady_clock::now();
 		if(!target_matched || !enabled || !pose_available || recenter_pending || now<pose_sampled_at || now-pose_sampled_at>std::chrono::milliseconds(150))
 		{remote_view_state.suspend();return false;}
 		return remote_view_state.apply_control(command,local_angles,epoch,recenter_count,
-			std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count(),command_time,rates,stick);
+			std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count(),command_time,rates,stick,head_aim);
 	}
 	void record_game_command(const int command_time, const int packed_pitch, const bool tracked) noexcept
 	{

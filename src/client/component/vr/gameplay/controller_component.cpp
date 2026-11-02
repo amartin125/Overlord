@@ -87,6 +87,8 @@ namespace vr::controllers
 		game::dvar_t* roomscale_leash{};
 		game::dvar_t* roomscale_walk{};
 		game::dvar_t* comfort_vignette_strength{};
+		game::dvar_t* remote_head_aim{};
+		game::dvar_t* remote_invert_pitch{};
 		std::atomic<std::uint64_t> roomscale_walk_commands{};
 		constexpr float walk_deadzone_meters=.12f, walk_max_fraction=.6f;
 		std::atomic<std::uint64_t> physical_crouch_count{};
@@ -187,6 +189,7 @@ namespace vr::controllers
 					!head.recenter_pending && head.recenter_count==input.reference_generation && normal_gameplay();
 				remote_allowed=allowed && input.focused;
 				stick=remote_locomotion.consume(input,remote,remote_input_seen,remote_allowed,turn_deadzone->current.value,controller_input::clock::now());
+				if(remote_invert_pitch && remote_invert_pitch->current.enabled)stick.pitch=-stick.pitch;
 				if(remote && !remote_allowed)head_pose_bridge::suspend_remote_view();
 				gameplay::fixed_sniper::command(input,allowed,cmd,reinterpret_cast<float*>(client_angles_address),
 					deadzone->current.value,turn_speed->current.value);
@@ -219,7 +222,8 @@ namespace vr::controllers
 			utils::hook::invoke<void>(finish_move_address, local_client, cmd);
 			if(remote && remote_epoch && remote_allowed && remote_input_seen && remote_axes_verified && cmd)
 			{
-				if(head_pose_bridge::apply_remote_control(cmd->remoteControlAngles,remote_rates(),{stick.pitch,stick.yaw},cmd->serverTime,remote_epoch))
+				if(head_pose_bridge::apply_remote_control(cmd->remoteControlAngles,remote_rates(),{stick.pitch,stick.yaw},cmd->serverTime,remote_epoch,
+					remote_head_aim && remote_head_aim->current.enabled))
 					++remote_axis_commands;
 			}
 			if(remote && (stick.pitch!=0 || stick.yaw!=0))++remote_stick_commands;
@@ -616,6 +620,10 @@ namespace vr::controllers
 				"Maximum horizontal metres the camera may drift from the player's collision body; 0 disables");
 			comfort_vignette_strength = dvars::register_float("vr_comfortVignette", 0.0f, 0.0f, 1.0f, game::DVAR_FLAG_SAVED,
 				"Darken the edges of view while moving or turning with the sticks (OpenXR); 0 disables");
+			remote_head_aim = dvars::register_bool("vr_remoteHeadAim", false, game::DVAR_FLAG_SAVED,
+				"Head motion steers the Predator/AGM missile; off: the right stick steers and the head only looks around");
+			remote_invert_pitch = dvars::register_bool("vr_remoteInvertPitch", false, game::DVAR_FLAG_SAVED,
+				"Invert right-stick up/down while controlling the Predator/AGM camera or missile");
 			roomscale_walk = dvars::register_bool("vr_roomscaleWalk", false, game::DVAR_FLAG_SAVED,
 				"Move the character toward your head when you physically step (needs vr_roomscaleLeash > 0.12)");
 			command::add("vr_input_status", print_status);

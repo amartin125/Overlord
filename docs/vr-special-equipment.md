@@ -258,6 +258,11 @@ branch uses native view angles; the missile branch uses its signed two-axis
 Head angular changes are converted using the original pitch/yaw rate dvars and
 command duration. Motion beyond one command's range remains pending instead of
 being lost to byte saturation; pause, focus loss and recenter clear that motion.
+In the missile branch, head steering is off by default (`vr_remoteHeadAim 0`):
+the look stick alone steers and head motion is left in the render correction,
+so the head looks around the missile view. With `vr_remoteHeadAim 1`, head
+up/left steers like stick up/left (it was previously inverted on both axes).
+`vr_remoteInvertPitch 1` inverts the stick's up/down for both remote modes.
 The look stick (right stick by default) adds continuous pitch/yaw in both modes,
 independent of walking snap-turn settings. Entry and a control-mode change
 require a neutral stick before steering. The complete native

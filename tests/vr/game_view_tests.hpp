@@ -83,15 +83,15 @@ inline void expect_native_game_view()
 		const std::array<float,2> rates{30,60};
 		require(remote.apply_control(command,{0,0,0},15,1,100,1000,rates,{0,0}) && command==std::array<std::int8_t,2>{},
 			"native remote axes enter at neutral without an artificial steering jump");
-		command={};require(remote.apply_control(command,{3,6,0},15,1,200,1100,rates,{0,0}) && command[0]==127 && command[1]==-127,
-			"HMD angular delivery keeps its independent pitch/yaw convention and native degree rates");
+		command={};require(remote.apply_control(command,{3,6,0},15,1,200,1100,rates,{0,0}) && command[0]==-127 && command[1]==127,
+			"head up/left steers the same way as stick up/left at native degree rates");
 		remote.record(1100);
 		const auto correction=remote.correction(15,1,1100,full_axis(3,6,0));
 		for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)require(close(correction[i][j],i==j?1.f:0.f),
 			"native remote command delivery is removed from late camera correction exactly once");
 		for(int i=0;i<3;++i)
 		{
-			command={};require(remote.apply_control(command,{12,6,0},15,1,300+i*100,1200+i*100,rates,{0,0}) && command[0]==127,
+			command={};require(remote.apply_control(command,{12,6,0},15,1,300+i*100,1200+i*100,rates,{0,0}) && command[0]==-127,
 				"head motion beyond one native steering step remains pending instead of being discarded by byte saturation");
 		}
 		command={};remote.apply_control(command,{12,6,0},15,1,600,1500,rates,{0,0});
@@ -106,6 +106,19 @@ inline void expect_native_game_view()
 		}
 		command={};remote.apply_control(command,{-60,90,0},15,2,710,1610,rates,{0,0});
 		require(command==std::array<std::int8_t,2>{},"recenter discards pending missile turns instead of replaying the previous reference");
+	}
+	{
+		// Stick-only missile steering: head motion never steers; it stays in the
+		// render correction so the head looks around the missile view.
+		vr::game_view::remote_view remote;std::array<std::int8_t,2> command{};const std::array<float,2> rates{30,60};
+		require(remote.apply_control(command,{0,0,0},15,1,100,1000,rates,{0,0},false),"stick-only steering enters at neutral");
+		command={};require(remote.apply_control(command,{10,20,0},15,1,200,1100,rates,{0,0},false) && command==std::array<std::int8_t,2>{},
+			"head motion does not steer the missile without head aim");
+		command={};remote.apply_control(command,{10,20,0},15,1,300,1200,rates,{1,0},false);
+		require(command[0]==-127 && command[1]==0,"the stick still steers with head aim off");
+		remote.record(1200);
+		const auto correction=remote.correction(15,1,1200,full_axis(10,20,0));
+		require(!close(correction[0][0],1.f),"unconsumed head turn remains a look-around camera correction");
 	}
 	for (const auto direction : {-1, 1})
 	{

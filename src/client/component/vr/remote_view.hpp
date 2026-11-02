@@ -44,8 +44,10 @@ namespace vr::game_view
 			consumed_=previous_=head;reference_=reference;at_=now;seeded_=pending_=true;return true;
 		}
 		bool apply_control(std::array<std::int8_t,2>& command,continuous_angles head,std::uint64_t epoch,std::uint64_t reference,
-			std::int64_t now,int command_time,std::array<float,2> rates,std::array<float,2> stick)noexcept
+			std::int64_t now,int command_time,std::array<float,2> rates,std::array<float,2> stick,bool head_aim=true)noexcept
 		{
+			// Without head aim the stick alone steers. No head motion is consumed,
+			// so the render correction keeps all of it: the head looks around.
 			if(!epoch || !reference || !std::isfinite(head.pitch) || !std::isfinite(head.yaw) || !std::isfinite(head.roll))return false;
 			for(unsigned i=0;i<2;++i)if(!std::isfinite(rates[i]) || rates[i]<=0 || rates[i]>720 ||
 				!std::isfinite(stick[i]) || std::abs(stick[i])>1.001f)return false;
@@ -53,6 +55,7 @@ namespace vr::game_view
 			const auto elapsed=std::int64_t(command_time)-command_time_;
 			const bool seed=!seeded_ || reference_!=reference || now<at_ || now-at_>150 || elapsed<0 || elapsed>150;
 			if(seed){consumed_=head;remaining_={};roll_origin_=head.roll;count_=next_=0;}
+			else if(!head_aim)remaining_={};
 			else
 			{
 				remaining_[0]=std::remainder(remaining_[0]+std::remainder(head.pitch-previous_.pitch,360.f),360.f);
@@ -66,7 +69,9 @@ namespace vr::game_view
 				const auto base=pack(float(command[i])/127.f-stick[i]);
 				command[i]=base;
 				if(seed || !elapsed)continue;
-				const float step=rates[i]*float(elapsed)*.001f,sign=i?-1.f:1.f;
+				// Head up/left steers like stick up/left: the native wire negates
+				// logical up/right, so head pitch-up and yaw-left map to -/+.
+				const float step=rates[i]*float(elapsed)*.001f,sign=i?1.f:-1.f;
 				command[i]=pack(float(base)/127.f+sign*remaining_[i]/step);
 				const float delivered=sign*float(int(command[i])-int(base))/127.f*step;
 				remaining_[i]-=delivered;
