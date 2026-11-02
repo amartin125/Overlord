@@ -86,6 +86,9 @@ over. Read this first, then `CONTRIBUTING.md` and `docs/development.md`.
 | Guns too far forward | "Meta Quest 2" calibration preset: `back = 0.04 m` | `vr/settings.hpp` | launcher preset |
 | Roomscale walking | Optional: idle stick + offset > 0.12 m walks toward head (≤ 60% speed); bridge absorbs body catch-up only toward head, only while a walk request is fresh | `vr/roomscale_walk.hpp`, leash `compensate`, bridge `roomscale_walk_target` | `vr_roomscaleWalk` 0 (off) |
 | Comfort | Optional radial edge darkening while stick-moving/turning, in OpenXR eye blit shader | `vr/comfort_vignette.hpp`, `texture_blit.cpp`, `openxr_runtime.cpp` | `vr_comfortVignette` 0 (off) |
+| AK (and every slide/bolt) charging handle missed when Trigger is pressed a moment before the hand arrives | Same held press grabs the handle if the hand gets within 4 cm inside the grace window; arbiter still refuses a press used elsewhere | `part_press_grace.hpp`, `physical_reload_runtime.cpp` | `vr_partGrabGrace` 250 ms (0 off) |
+| Grenades only travel ~1 m | Release speed = peak over last 150 ms (≥20 ms spans) instead of average up to release, which read the slowing follow-through | `grenade_state.hpp` | existing `vr_grenadeThrowSpeedScale` 2.5 |
+| Predator/AGM missile steering inverted with the head | Missile steering is stick-only by default (head looks around); head aim sign fixed to match the stick when enabled | `remote_view.hpp`, `head_pose_bridge.*`, `controller_component.cpp` | `vr_remoteHeadAim` 0, `vr_remoteInvertPitch` 0 |
 | Diagnostics | **Temporary** memory log (see below) | `memory_log.cpp`, `d3d11/texture_diagnostics.*` | `vr_memoryLog` 1 |
 
 Also: `version.json` → `Beta 8 test` / `0.1.0.8`; English and Chinese help text
@@ -101,7 +104,12 @@ prints pass-through and hostile counters.
 1. **`Create2DTexture … 8007000e` (E_OUTOFMEMORY) in the airport mission
    ("No Russian").** Player says it did not happen on official Beta 7. Task
    Manager showed dedicated GPU memory around 60% (unconfirmed it was the
-   memory figure, not usage). Code review found nothing on this branch that
+   memory figure, not usage). Local session 2026-11-01: the memory log from a
+   Beta 8 test run (favela, invasion, favela_escape) had zero texture failures
+   and GPU use ~1.6–2.8 of a 7.0 GB budget, but Windows commit at ~115 of
+   118 GB (game ~9.8 GB), still ~109 GB with the game closed and no visible
+   process accounting for it. Commit exhaustion, not VRAM, is the prime suspect.
+   Code review found nothing on this branch that
    creates textures; the knife pack is now conditional and `vr_renderScale`
    exists. The player had **not yet** applied: Shader Preloading off, Texture
    Resolution Normal, lower runtime resolution, page file 16–32 GB, closing
