@@ -59,7 +59,10 @@ Fuse time now uses the guarded native player accessor, giving frag/pomegranate
 3500 ms and flash 1000 ms in the captured definitions. The SDK's timer field
 names were reversed for this H2 path; see [native evidence](vr-cheat-throwables.md).
 Smoke uses its loaded definition. Native simulation time freezes cooking during
-pause. Measured hand velocity is filtered and capped at 15 m/s before tuning:
+pause. Release velocity is the peak hand velocity over the last 150 ms (each
+span at least 20 ms), because Grip usually opens after the stroke's fastest
+moment; an average up to release made late releases fall short. It is capped
+at 15 m/s before tuning:
 `vr_grenadeThrowSpeedScale` defaults to 2.5, and `vr_footballThrowSpeedScale`
 defaults to an additional 1.5 (3.75 total for football). The resulting ceilings
 at these defaults are 37.5 / 56.25 m/s, with a final native-unit safety bound.

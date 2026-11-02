@@ -74,7 +74,7 @@ namespace vr::gameplay::grenades
 	class release_motion
 	{
 		struct point {hands::vec p{};controller_input::clock::time_point time{};};
-		std::array<point,8> points{};unsigned count{};
+		std::array<point,24> points{};unsigned count{}; // Covers the peak window at up to 144 Hz.
 	public:
 		void reset()noexcept{count=0;}
 		void sample(hands::vec p,controller_input::clock::time_point time,float units)noexcept
@@ -90,12 +90,29 @@ namespace vr::gameplay::grenades
 		hands::vec velocity(controller_input::clock::time_point now,float units)const noexcept
 		{
 			if(count<2 || now<points[count-1].time || now-points[count-1].time>std::chrono::milliseconds(100))return {};
-			unsigned first=count-2;
-			while(first && points[count-1].time-points[first-1].time<=std::chrono::milliseconds(80))--first;
-			const float dt=std::chrono::duration<float>(points[count-1].time-points[first].time).count();
-			if(dt<.005f || !std::isfinite(units) || units<=0)return {};
-			auto v=hands::scale(hands::sub(points[count-1].p,points[first].p),1/dt);
-			const float speed=hands::length(v),limit=units*15.f;
+			if(!std::isfinite(units) || units<=0)return {};
+			// Peak speed over the last 150 ms. Grip usually opens after the hand's
+			// fastest moment, so an average up to release under-reads the throw.
+			// Each span covers at least 20 ms so one jittery sample cannot spike.
+			hands::vec v{};float best=-1;
+			for(unsigned k=count-1;k>=1;--k)
+			{
+				if(points[count-1].time-points[k].time>std::chrono::milliseconds(150))break;
+				unsigned j=k-1;
+				while(j && points[k].time-points[j].time<std::chrono::milliseconds(20))--j;
+				const float dt=std::chrono::duration<float>(points[k].time-points[j].time).count();
+				if(dt<.02f)continue;
+				const auto span=hands::scale(hands::sub(points[k].p,points[j].p),1/dt);
+				if(const float s=hands::length(span);s>best){best=s;v=span;}
+			}
+			if(best<0)
+			{
+				// History shorter than one span: use all of it, as before.
+				const float dt=std::chrono::duration<float>(points[count-1].time-points[0].time).count();
+				if(dt<.005f)return {};
+				v=hands::scale(hands::sub(points[count-1].p,points[0].p),1/dt);best=hands::length(v);
+			}
+			const float speed=best,limit=units*15.f;
 			return speed>limit?hands::scale(v,limit/speed):v;
 		}
 	};

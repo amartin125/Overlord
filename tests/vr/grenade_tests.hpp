@@ -219,5 +219,16 @@ namespace grenade_tests
 		check(vr::gameplay::hands::length(motion.velocity(now+60ms,40))==0,"first sample after quality suspension cannot retain a throw impulse");
 		motion.sample({1004,0,0},now+100ms,40);
 		check(std::abs(motion.velocity(now+100ms,40)[0]-100)<.01f,"continuous grenade motion resumes after history is reseeded");
+		{
+			// 90 Hz: 8 m/s forward stroke, then the hand stops for 60 ms before Grip opens.
+			release_motion late;const auto t=vr::controller_input::clock::now();float x=0;int frame=0;
+			const auto at=[&](int n){return t+std::chrono::microseconds(n*11111);};
+			for(;frame<12;++frame){late.sample({x,0,0},at(frame),40);x+=8.f*40/90;}
+			for(int n=0;n<6;++n,++frame)late.sample({x,0,0},at(frame),40);
+			const float mps=late.velocity(at(frame-1),40)[0]/40;
+			check(mps>7 && mps<=8.01f,"a release after the hand slows still throws at the stroke's peak speed");
+			release_motion jitter;jitter.sample({0,0,0},t,40);jitter.sample({2,0,0},t+11ms,40);jitter.sample({0,0,0},t+22ms,40);
+			check(vr::gameplay::hands::length(jitter.velocity(t+22ms,40))<40*1.f,"single-frame tracking jitter cannot create a strong throw");
+		}
 	}
 }
