@@ -377,6 +377,11 @@ participate in OpenXR frame pacing or submission. Standalone SDK tests inject
 copied metadata and do not query a live runtime. Standard mode skips controller
 model discovery in this query. In legacy mode, after replacing SteamVR
 controller hardware, run `vr_reinit` to refresh its static reference.
+Controllers that were asleep or not yet identified when VR started leave the
+reference missing while their grips track (`calibration_invalid`). After 3 s of
+focused tracked-but-rejected grips, `controller_reference_recovery.hpp` requests
+the same reinitialization automatically, at most 3 times per game session and
+20 s apart; the console logs each attempt.
 
 Runtime selection is separate from the user's OpenXR/OpenVR API choice.
 `openxr_startup.hpp` keeps the decision independent from live discovery. Explicit

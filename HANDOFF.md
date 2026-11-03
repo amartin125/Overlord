@@ -90,6 +90,7 @@ over. Read this first, then `CONTRIBUTING.md` and `docs/development.md`.
 | Grenades only travel ~1 m | Release speed = peak over last 150 ms (≥20 ms spans) instead of average up to release, which read the slowing follow-through | `grenade_state.hpp` | existing `vr_grenadeThrowSpeedScale` 2.5 |
 | Predator/AGM missile steering inverted with the head | Missile steering is stick-only by default (head looks around); head aim sign fixed to match the stick when enabled | `remote_view.hpp`, `head_pose_bridge.*`, `controller_component.cpp` | `vr_remoteHeadAim` 0, `vr_remoteInvertPitch` 0 |
 | Rifles dropped instead of going on the back | Back stow also accepts releases over the shoulders/above the head and up to 350 ms after leaving the back slot; draws unchanged | `weapon_holsters.hpp`, `holster_stow_grace.hpp`, `weapon_carry_runtime.cpp` | existing `vr_holsterBack*` |
+| No hands or gun for a whole session (controllers unidentified at startup) | Tracked grips the legacy reference keeps rejecting for 3 s trigger an automatic `vr_reinit`, up to 3 times 20 s apart | `controller_reference_recovery.hpp`, `vr_component.cpp` | none (`vr_reinit` still works by hand) |
 | Hornet's Nest end: sideways suppressed pistol | Not fixed yet. Memory log now names the held weapon and any assembly the grip profiles reject (`grip rejected ...`) | `memory_log.*`, `hands/component.cpp` | `vr_memoryLog` |
 | Diagnostics | **Temporary** memory log (see below) | `memory_log.cpp`, `d3d11/texture_diagnostics.*` | `vr_memoryLog` 1 |
 

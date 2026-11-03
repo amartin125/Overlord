@@ -24,6 +24,8 @@
 #include "engine_stereo_renderer.hpp"
 #include "engine_view_probe.hpp"
 #include "engine_scene_resolution.hpp"
+#include "controller_input.hpp"
+#include "controller_reference_recovery.hpp"
 #include "head_pose_bridge.hpp"
 #include "native_menu.hpp"
 #include "vr_runtime.hpp"
@@ -789,6 +791,24 @@ namespace vr
 				enabled ? "enabled" : "disabled");
 		}
 
+		// Re-identify controllers that were asleep when VR started; see
+		// controller_reference_recovery.hpp.
+		void recover_controller_reference()
+		{
+			static controller_profile::reference_recovery recovery;
+			using namespace controller_input;
+			const auto input = latest();
+			bool rejected{};
+			for (unsigned h = 0; h < 2; ++h)
+				rejected |= input.source.channels[index(hand_channel(input_channel::left_grip, h))].reason ==
+				            input_reason::calibration_invalid;
+			if (!recovery.observe(input.focused && rejected, controller_profile::reference_recovery::clock::now()))
+				return;
+			console::warn("[VR] controller grip reference unavailable while tracked; reinitializing (attempt %u/%u)\n",
+				recovery.attempts(), controller_profile::reference_recovery::attempt_limit);
+			scheduler::once(request_reinitialize, scheduler::pipeline::main);
+		}
+
 		void recenter_head_tracking()
 		{
 			if (!is_accepting_work()) return;
@@ -862,6 +882,7 @@ namespace vr
 
 			scheduler::loop(on_renderer_frame, scheduler::pipeline::renderer);
 			scheduler::loop(monitor_present_progress, scheduler::pipeline::async, 250ms);
+			scheduler::loop(recover_controller_reference, scheduler::pipeline::async, 500ms);
 			gui::on_frame(on_gui_frame, true);
 			command::add("vr_status", print_status);
 			diagnostics::support::start([]{return vr_enable&&vr_enable->current.enabled;});
