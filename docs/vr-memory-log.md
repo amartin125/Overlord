@@ -11,7 +11,11 @@
 - one line when the game starts;
 - one `sample` line every 5 seconds;
 - one `TEXTURE ... FAILED` line the moment any texture fails to load, with its
-  size and error code, written before the game shows its fatal error.
+  size and error code, written before the game shows its fatal error;
+- one `weapon ... held=<name>` line whenever the held weapon changes, so a
+  misplaced or odd-looking gun can be matched to its native weapon name;
+- one `grip rejected reason=... models=...` line when no VR grip profile
+  accepts a held weapon assembly (it then keeps the native pose).
 
 Each line records the map, the game's committed memory and RAM use, Windows'
 total commit against its limit (RAM plus page file), free RAM, and the game's
@@ -37,7 +41,8 @@ The last lines before a crash show which limit was hit:
 
 Delete these, then rebuild:
 
-1. `src/client/component/memory_log.cpp`
+1. `src/client/component/memory_log.cpp` and `memory_log.hpp`, plus the
+   `memory_log::note` block and include in `vr/gameplay/hands/component.cpp`
 2. In `src/client/component/d3d11/texture_diagnostics.hpp` and `.cpp`: the
    `failure_observer` type, `set_failure_observer`, the `observer` variable and
    the one line in `record_failure` that calls it.

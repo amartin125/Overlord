@@ -5,6 +5,7 @@
 #include "game/dvars.hpp"
 #include "command.hpp"
 #include "console.hpp"
+#include "memory_log.hpp"
 #include "scheduler.hpp"
 
 #include <version.h>
@@ -132,6 +133,32 @@ namespace memory_log
 				system_memory() + " " + gpu_memory() + " texture_failures=" + std::to_string(texture_failures.load());
 		}
 
+		// Held weapon, logged only when it changes, so a report of odd hands or
+		// a misplaced gun can be matched to its native weapon name.
+		std::string last_weapon;
+
+		void watch_weapon()
+		{
+			const auto* client = game::CL_IsCgameInitialized() ? game::g_entities[0].client : nullptr;
+			std::string name = client ? "none" : "";
+			if (client)
+			{
+				unsigned token{};
+				std::memcpy(&token, reinterpret_cast<const std::byte*>(client) + 0x3bc, sizeof(token));
+				token &= 511;
+				if (token && game::weapon_defs[token])
+				{
+					std::array<char, 256> text{};
+					game::BG_GetWeaponNameComplete(game::Weapon{token}, false, text.data(), static_cast<unsigned>(text.size()));
+					text.back() = '\0';
+					if (text[0]) name = text.data();
+				}
+			}
+			if (name == last_weapon) return;
+			last_weapon = name;
+			if (!name.empty()) append(timestamp() + " weapon map=" + map_name() + " held=" + name);
+		}
+
 		void on_texture_failure(const d3d11::texture_diagnostics::event& value) noexcept
 		{
 			try
@@ -151,6 +178,18 @@ namespace memory_log
 		}
 	}
 
+	void note(const std::string& line)
+	{
+		static std::mutex note_mutex;
+		static std::string last;
+		{
+			const std::lock_guard lock(note_mutex);
+			if (line == last) return;
+			last = line;
+		}
+		append(timestamp() + " " + line);
+	}
+
 	class component final : public component_interface
 	{
 	public:
@@ -165,6 +204,10 @@ namespace memory_log
 			{
 				if (alive) append(sample("sample"));
 			}, scheduler::pipeline::async, interval);
+			scheduler::loop([]
+			{
+				if (alive && (!enabled || enabled->current.enabled)) watch_weapon();
+			}, scheduler::pipeline::server, std::chrono::milliseconds(250));
 			command::add("memory_log", []
 			{
 				const auto line = sample("manual");

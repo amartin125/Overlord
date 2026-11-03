@@ -5,6 +5,7 @@
 #include "component/vr/gameplay/native_carry_selection_policy.hpp"
 #include "component/vr/gameplay/grip_edges.hpp"
 #include "component/vr/gameplay/weapon_holsters.hpp"
+#include "component/vr/gameplay/holster_stow_grace.hpp"
 #include "component/vr/gameplay/weapon_carry_grip.hpp"
 #include "component/vr/gameplay/weapon_carry_profiles.hpp"
 #include "component/vr/gameplay/weapon_carry_pose.hpp"
@@ -377,6 +378,30 @@ namespace weapon_carry_tests
 			hit(holsters,body_point({-.30f,-.35f,-.18f}))==location::back &&
 			hit(holsters,body_point({-.35f,0,-.56f}))==location::back,"back slot covers both shoulder approaches and lower back");
 		check(hit(holsters,body_point({.25f,.23f,-.6f}))==location::absent,"forward hand motion is outside body storage");
+		check(hit(holsters,body_point({.03f,.28f,-.05f}),7,true)==location::back &&
+			hit(holsters,body_point({-.10f,-.15f,.22f}),7,true)==location::back &&
+			hit(holsters,body_point({-.20f,0,.28f}),7,true)==location::back,"stowing reaches over either shoulder and above the head");
+		check(hit(holsters,body_point({.03f,.28f,-.05f}))==location::absent &&
+			hit(holsters,body_point({-.10f,-.15f,.22f}))==location::absent,"drawing keeps the original back volume");
+		check(hit(holsters,body_point({.16f,.08f,-.18f}),7,true)==location::absent &&
+			hit(holsters,body_point({.12f,0,-.05f}),7,true)==location::absent &&
+			hit(holsters,body_point({.25f,.23f,-.6f}),7,true)==location::absent &&
+			hit(holsters,body_point({.05f,.40f,-.30f}),7,true)==location::absent,"aiming, face and side releases still drop instead of stowing");
+		{
+			using clock=std::chrono::steady_clock;
+			const auto t=clock::time_point{}+std::chrono::seconds(10);
+			recent_back_reach reach;
+			check(reach.resolve(location::absent,t)==location::absent,"no recent back pass keeps a drop");
+			reach.observe(location::left_waist,t);
+			check(reach.resolve(location::absent,t)==location::absent,"waist pass does not stow on the back");
+			reach.observe(location::back,t);
+			check(reach.resolve(location::absent,t+std::chrono::milliseconds(300))==location::back,"release just after leaving the back still stows");
+			check(reach.resolve(location::right_waist,t+std::chrono::milliseconds(100))==location::right_waist,"a slot under the hand wins over the grace");
+			check(reach.resolve(location::absent,t+std::chrono::milliseconds(400))==location::absent,"a late release outside the back drops");
+			check(reach.resolve(location::absent,t-std::chrono::milliseconds(1))==location::absent,"clock going backwards cannot stow");
+			reach.clear();
+			check(reach.resolve(location::absent,t+std::chrono::milliseconds(100))==location::absent,"an emptied hand forgets the back pass");
+		}
 		auto rotated=body;rotated.head_yaw_axis={{{0,1,0},{-1,0,0},{0,0,1}}};
 		const auto rotated_slots=locate_holsters(rotated);
 		const auto turned_slide=vr::gameplay::hands::rotate(holster_rotation(rotated.head_yaw_axis,location::left_waist),{0,0,1});

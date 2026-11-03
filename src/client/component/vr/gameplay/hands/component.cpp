@@ -17,6 +17,7 @@
 #include "component/command.hpp"
 #include "component/console.hpp"
 #include "component/fastfiles.hpp"
+#include "component/memory_log.hpp"
 #include "game/dvars.hpp"
 #include "game/game.hpp"
 #include "../grip_presenter.hpp"
@@ -287,6 +288,16 @@ namespace vr::gameplay::hands
 			        ? weapons::bind_ejection_port(result, {bones.data(), object.bone_count})
 			        : weapons::ejection_port{};
 			probe.grip_reason = match.reason;
+			if (!match.value)
+			{
+				// TEMPORARY (memory log): name assemblies no grip profile accepts.
+				std::string line = "grip rejected reason=";
+				line += match.reason ? match.reason : "no registered receiver";
+				line += " models=";
+				for (size_t m = 0; m < object.model_count; ++m)
+					line.append(models[m].name).append(":").append(std::to_string(models[m].count)).append(" ");
+				memory_log::note(line);
+			}
 			solver().binding.assembly_key = 14695981039346656037ull;
 			for (size_t m = 0; m < object.model_count; ++m)
 			{

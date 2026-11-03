@@ -60,6 +60,11 @@ a headset acceptance check for this candidate.
 - Successful pickup, drawing, stowing and exchanging provide one light 22 ms
   pulse on the interacting hand. Rejections and physical drops are silent.
   The existing `vr_weaponHapticScale` controls strength (zero disables it).
+- Stowing on the back also accepts a release over either shoulder or above
+  the head (up to 6 cm in front of the eyes, never in front of the face), and
+  a release up to 350 ms after the holding hand left the back slot. Both only
+  turn a would-be drop into a back stow; draws keep the original back volume
+  so head gestures such as nightvision cannot pull the back weapon.
 - Release inside an empty compatible slot to stow and leave that hand empty.
   Release inside an occupied compatible slot to exchange. Regrip before
   releasing the exchanged weapon again.

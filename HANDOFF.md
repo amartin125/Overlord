@@ -89,6 +89,8 @@ over. Read this first, then `CONTRIBUTING.md` and `docs/development.md`.
 | AK (and every slide/bolt) charging handle missed when Trigger is pressed a moment before the hand arrives | Same held press grabs the handle if the hand gets within 4 cm inside the grace window; arbiter still refuses a press used elsewhere | `part_press_grace.hpp`, `physical_reload_runtime.cpp` | `vr_partGrabGrace` 250 ms (0 off) |
 | Grenades only travel ~1 m | Release speed = peak over last 150 ms (≥20 ms spans) instead of average up to release, which read the slowing follow-through | `grenade_state.hpp` | existing `vr_grenadeThrowSpeedScale` 2.5 |
 | Predator/AGM missile steering inverted with the head | Missile steering is stick-only by default (head looks around); head aim sign fixed to match the stick when enabled | `remote_view.hpp`, `head_pose_bridge.*`, `controller_component.cpp` | `vr_remoteHeadAim` 0, `vr_remoteInvertPitch` 0 |
+| Rifles dropped instead of going on the back | Back stow also accepts releases over the shoulders/above the head and up to 350 ms after leaving the back slot; draws unchanged | `weapon_holsters.hpp`, `holster_stow_grace.hpp`, `weapon_carry_runtime.cpp` | existing `vr_holsterBack*` |
+| Hornet's Nest end: sideways suppressed pistol | Not fixed yet. Memory log now names the held weapon and any assembly the grip profiles reject (`grip rejected ...`) | `memory_log.*`, `hands/component.cpp` | `vr_memoryLog` |
 | Diagnostics | **Temporary** memory log (see below) | `memory_log.cpp`, `d3d11/texture_diagnostics.*` | `vr_memoryLog` 1 |
 
 Also: `version.json` → `Beta 8 test` / `0.1.0.8`; English and Chinese help text

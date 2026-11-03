@@ -26,6 +26,7 @@
 #include "native_carry.hpp"
 #include "native_carry_model.hpp"
 #include "weapon_holsters.hpp"
+#include "holster_stow_grace.hpp"
 #include "official_cheats.hpp"
 #include "holster_presentation.hpp"
 #include "hands/attachment_pose.hpp"
@@ -67,6 +68,7 @@ namespace vr::gameplay::weapons::carry
 		game::dvar_t* grip_mode{};
 		game::dvar_t* support_grip_lock{};
 		std::array<game::dvar_t*, 6> slot_settings{};
+		std::array<recent_back_reach, 2> back_reach{};
 		inventory owned; // Server is the only writer; readers receive a published copy.
 		std::mutex publication_mutex;
 		inventory published;
@@ -791,6 +793,11 @@ namespace vr::gameplay::weapons::carry
 			                      slot_settings[4]->current.value,
 			                      slot_settings[5]->current.value};
 			const auto slots = locate_holsters(body, layout);
+			for (unsigned h = 0; h < 2; ++h)
+				if (!(valid_hands & (1u << h)) || !owned.in_hand(static_cast<hand>(h)))
+					back_reach[h].clear();
+				else
+					back_reach[h].observe(hit(slots, hands[h].position, 4, true), now);
 			if (interaction::debug::body_enabled())
 			{
 				interaction::debug::body_sample diagnostic;
@@ -839,7 +846,8 @@ namespace vr::gameplay::weapons::carry
 				};
 				const auto last = valid_hand(v->owner.rear) ? v->owner.rear : v->owner.support;
 				const auto target = (valid_hands & (1u << static_cast<unsigned>(last)))
-				                        ? hit(slots, hands[static_cast<int>(last)].position)
+				                        ? back_reach[static_cast<unsigned>(last)].resolve(
+				                              hit(slots, hands[static_cast<int>(last)].position, 7, true), now)
 				                        : location::absent;
 				const auto released_hand = [&](hand actor)
 				{ return !valid_hand(actor) || (event.released & (1u << unsigned(actor))); };

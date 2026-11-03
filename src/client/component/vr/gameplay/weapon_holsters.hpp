@@ -10,7 +10,11 @@ namespace vr::gameplay::weapons::carry
 		float waist_width{.23f},waist_down{.60f},back_distance{.22f},back_down{.24f};
 		float waist_radius{.16f},back_radius{.20f};
 	};
-	struct holsters {bool valid{};std::array<hands::vec,3> centers{};std::array<float,3> radii{};std::array<body_reach_volume,3> volumes{};};
+	// back_reach adds the space over both shoulders and above the head, where
+	// an over-the-shoulder stow ends. It stops short of the face so aiming and
+	// cheek-weld releases stay outside storage. Stowing only: draws keep the
+	// original volume so head gestures (nightvision) cannot pull the back gun.
+	struct holsters {bool valid{};std::array<hands::vec,3> centers{};std::array<float,3> radii{};std::array<body_reach_volume,3> volumes{};body_reach_volume back_reach{};};
 	inline hands::quat holster_rotation(const std::array<hands::vec,3>& body_axis,location slot) noexcept
 	{
 		using namespace hands;
@@ -38,9 +42,10 @@ namespace vr::gameplay::weapons::carry
 		for (unsigned h=0;h<2;++h) out.volumes[h]=waist_reach(out.centers[h],body.head_yaw_axis,body.units_per_meter,h,0,layout.waist_radius);
 		const auto u=body.units_per_meter;
 		out.volumes[2]={out.centers[2],{-.16f*u,-.30f*u,-.30f*u},{0,.30f*u,.12f*u},body.head_yaw_axis,layout.back_radius*u};
+		out.back_reach={body.head_position,{-.30f*u,-.35f*u,-.16f*u},{0,.35f*u,.25f*u},body.head_yaw_axis,.06f*u};
 		out.valid=true;return out;
 	}
-	inline location hit(const holsters& slots,const hands::vec& point,unsigned eligible=7) noexcept
+	inline location hit(const holsters& slots,const hands::vec& point,unsigned eligible=7,bool stow=false) noexcept
 	{
 		if (!slots.valid) return location::absent;
 		constexpr std::array places{location::left_waist,location::right_waist,location::back};
@@ -48,7 +53,7 @@ namespace vr::gameplay::weapons::carry
 		for (std::size_t i=0;i<3;++i)
 		{
 			if (!(eligible&(1u<<i))) continue;
-			if (!slots.volumes[i].contains(point)) continue;
+			if (!slots.volumes[i].contains(point) && (i!=2 || !stow || !slots.back_reach.contains(point))) continue;
 			// Overlapping generous volumes resolve by their original anchor, not
 			// iteration order or the first box whose interior has zero distance.
 			const auto distance=hands::length(hands::sub(point,slots.centers[i]))/slots.radii[i];
