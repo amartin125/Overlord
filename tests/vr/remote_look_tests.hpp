@@ -24,21 +24,21 @@ template<class Check>void remote_look_tests(Check check)
 	remote_look controls;frame input{};const auto start=clock::now();
 	input.focused=input.turn_active=true;input.sequence=input.reference_generation=input.continuity_generation=1;input.sampled_at=start;
 	input.turn={1,1};
-	check(controls.consume(input,1,false,true,.2f,start).pitch==0,"held stick at remote entry cannot steer before neutral");
-	input.turn={};input.sampled_at+=10ms;++input.sequence;(void)controls.consume(input,1,false,true,.2f,input.sampled_at);
-	input.turn={1,1};input.sampled_at+=10ms;++input.sequence;const auto diagonal=controls.consume(input,1,false,true,.2f,input.sampled_at);
+	check(controls.consume(input,1,true,.2f,start).pitch==0,"held stick at remote entry cannot steer before neutral");
+	input.turn={};input.sampled_at+=10ms;++input.sequence;(void)controls.consume(input,1,true,.2f,input.sampled_at);
+	input.turn={1,1};input.sampled_at+=10ms;++input.sequence;const auto diagonal=controls.consume(input,1,true,.2f,input.sampled_at);
 	check(diagonal.pitch>.7f && diagonal.yaw>.7f && diagonal.seconds>0 &&
 		std::abs(std::hypot(diagonal.pitch,diagonal.yaw)-1)<.0001f,"remote right stick supplies both axes with radial normalization and no left-stick dependency");
-	check(controls.consume(input,1,true,true,.2f,input.sampled_at).yaw==0,"switching to native missile axes rearms a held stick");
-	input.turn={};input.sampled_at+=10ms;++input.sequence;(void)controls.consume(input,1,true,true,.2f,input.sampled_at);
+	check(controls.consume(input,1,true,.2f,input.sampled_at).yaw>.7f,"a stick held through missile launch keeps steering");
+	input.turn={};input.sampled_at+=10ms;++input.sequence;(void)controls.consume(input,1,true,.2f,input.sampled_at);
 	input.turn={0,-1};input.sampled_at+=10ms;++input.sequence;
-	check(controls.consume(input,1,true,true,.2f,input.sampled_at).pitch==-1,"backward stick supplies native down-look input");
-	input.focused=false;check(controls.consume(input,1,true,true,.2f,input.sampled_at).pitch==0,"focus loss cancels remote stick input");
-	input.focused=true;check(controls.consume(input,1,true,true,.2f,input.sampled_at).pitch==0,"focus recovery cannot resume a held remote stick");
-	input.turn={};input.sampled_at+=10ms;++input.sequence;(void)controls.consume(input,1,true,true,.2f,input.sampled_at);
+	check(controls.consume(input,1,true,.2f,input.sampled_at).pitch==-1,"backward stick supplies native down-look input");
+	input.focused=false;check(controls.consume(input,1,true,.2f,input.sampled_at).pitch==0,"focus loss cancels remote stick input");
+	input.focused=true;check(controls.consume(input,1,true,.2f,input.sampled_at).pitch==0,"focus recovery cannot resume a held remote stick");
+	input.turn={};input.sampled_at+=10ms;++input.sequence;(void)controls.consume(input,1,true,.2f,input.sampled_at);
 	input.turn={.1f,.1f};input.sampled_at+=10ms;++input.sequence;
-	const auto small=controls.consume(input,1,true,true,.2f,input.sampled_at);
+	const auto small=controls.consume(input,1,true,.2f,input.sampled_at);
 	check(small.pitch==0 && small.yaw==0,"remote look respects the existing radial stick deadzone");
 	input.turn={std::numeric_limits<float>::quiet_NaN(),0};
-	check(controls.consume(input,1,true,true,.2f,input.sampled_at).yaw==0,"nonfinite remote stick input is rejected");
+	check(controls.consume(input,1,true,.2f,input.sampled_at).yaw==0,"nonfinite remote stick input is rejected");
 }

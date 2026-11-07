@@ -20,6 +20,7 @@
 #include "../settings.hpp"
 #include "component/command.hpp"
 #include "component/console.hpp"
+#include "component/memory_log.hpp"
 #include "component/scheduler.hpp"
 #include "controller_buttons.hpp"
 #include "controller_firing.hpp"
@@ -145,6 +146,21 @@ namespace vr::controllers
 			}
 			return result;
 		}
+		// TEMPORARY (memory log): what the missile receives, once a second in flight.
+		void note_remote_steering(const game::usercmd_s& cmd,const controller_input::remote_stick& stick,bool delivered)
+		{
+			static std::chrono::steady_clock::time_point last{};
+			const auto now=std::chrono::steady_clock::now();
+			if(now-last<std::chrono::seconds(1))return;
+			last=now;
+			const auto rates=remote_rates();
+			const auto* range=game::Dvar_FindVar("missileRemoteSteerPitchRange");
+			const bool ranged=range && range->type==game::dvar_type::vec2;
+			memory_log::note(std::format("missile steer stick={:.2f}/{:.2f} wire={}/{} rates={:.0f}/{:.0f} pitch_range={:.0f}-{:.0f} delivered={}",
+				stick.pitch,stick.yaw,int(cmd.remoteControlAngles[0]),int(cmd.remoteControlAngles[1]),rates[0],rates[1],
+				ranged?range->current.vector[0]:0.f,ranged?range->current.vector[1]:0.f,int(delivered)));
+		}
+
 		void remote_input_stub(int client,game::usercmd_s* cmd)
 		{
 			utils::hook::invoke<void>(remote_input_address,client,cmd);
@@ -188,7 +204,7 @@ namespace vr::controllers
 				const bool allowed=alive && enabled && enabled->current.enabled && head.enabled && head.pose_available &&
 					!head.recenter_pending && head.recenter_count==input.reference_generation && normal_gameplay();
 				remote_allowed=allowed && input.focused;
-				stick=remote_locomotion.consume(input,remote,remote_input_seen,remote_allowed,turn_deadzone->current.value,controller_input::clock::now());
+				stick=remote_locomotion.consume(input,remote,remote_allowed,turn_deadzone->current.value,controller_input::clock::now());
 				if(remote_invert_pitch && remote_invert_pitch->current.enabled)stick.pitch=-stick.pitch;
 				if(remote && !remote_allowed)head_pose_bridge::suspend_remote_view();
 				gameplay::fixed_sniper::command(input,allowed,cmd,reinterpret_cast<float*>(client_angles_address),
@@ -222,9 +238,10 @@ namespace vr::controllers
 			utils::hook::invoke<void>(finish_move_address, local_client, cmd);
 			if(remote && remote_epoch && remote_allowed && remote_input_seen && remote_axes_verified && cmd)
 			{
-				if(head_pose_bridge::apply_remote_control(cmd->remoteControlAngles,remote_rates(),{stick.pitch,stick.yaw},cmd->serverTime,remote_epoch,
-					remote_head_aim && remote_head_aim->current.enabled))
-					++remote_axis_commands;
+				const bool delivered=head_pose_bridge::apply_remote_control(cmd->remoteControlAngles,remote_rates(),{stick.pitch,stick.yaw},cmd->serverTime,remote_epoch,
+					remote_head_aim && remote_head_aim->current.enabled);
+				if(delivered)++remote_axis_commands;
+				note_remote_steering(*cmd,stick,delivered);
 			}
 			if(remote && (stick.pitch!=0 || stick.yaw!=0))++remote_stick_commands;
 		}
@@ -620,8 +637,9 @@ namespace vr::controllers
 				"Maximum horizontal metres the camera may drift from the player's collision body; 0 disables");
 			comfort_vignette_strength = dvars::register_float("vr_comfortVignette", 0.0f, 0.0f, 1.0f, game::DVAR_FLAG_SAVED,
 				"Darken the edges of view while moving or turning with the sticks (OpenXR); 0 disables");
-			remote_head_aim = dvars::register_bool("vr_remoteHeadAim", false, game::DVAR_FLAG_SAVED,
-				"Head motion steers the Predator/AGM missile; off: the right stick steers and the head only looks around");
+			// Not vr_remoteHeadAim: its saved 0 would keep head steering off for existing players.
+			remote_head_aim = dvars::register_bool("vr_remoteHeadSteer", true, game::DVAR_FLAG_SAVED,
+				"Head motion steers the Predator/AGM missile with the right stick; off: the stick steers alone and the head only looks around");
 			remote_invert_pitch = dvars::register_bool("vr_remoteInvertPitch", false, game::DVAR_FLAG_SAVED,
 				"Invert right-stick up/down while controlling the Predator/AGM camera or missile");
 			roomscale_walk = dvars::register_bool("vr_roomscaleWalk", false, game::DVAR_FLAG_SAVED,

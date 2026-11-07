@@ -15,7 +15,9 @@
 - one `weapon ... held=<name>` line whenever the held weapon changes, so a
   misplaced or odd-looking gun can be matched to its native weapon name;
 - one `grip rejected reason=... models=...` line when no VR grip profile
-  accepts a held weapon assembly (it then keeps the native pose).
+  accepts a held weapon assembly (it then keeps the native pose);
+- one `missile steer ...` line a second during Predator/AGM flight, with the
+  stick, the values sent to the missile, and the native turn rates and pitch range.
 
 Each line records the map, the game's committed memory and RAM use, Windows'
 total commit against its limit (RAM plus page file), free RAM, and the game's
@@ -42,7 +44,9 @@ The last lines before a crash show which limit was hit:
 Delete these, then rebuild:
 
 1. `src/client/component/memory_log.cpp` and `memory_log.hpp`, plus the
-   `memory_log::note` block and include in `vr/gameplay/hands/component.cpp`
+   `memory_log::note` block and include in `vr/gameplay/hands/component.cpp`,
+   and `note_remote_steering`, its call and the include in
+   `vr/gameplay/controller_component.cpp`
 2. In `src/client/component/d3d11/texture_diagnostics.hpp` and `.cpp`: the
    `failure_observer` type, `set_failure_observer`, the `observer` variable and
    the one line in `record_failure` that calls it.
